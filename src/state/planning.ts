@@ -15,8 +15,10 @@ import {
   type ScheduleResult,
   type SchedulableTask,
 } from "../domain/scheduler";
+import { encodeParts, type Trigger } from "../domain/explain";
 import { formatClock, formatDuration, weekdayOf } from "../domain/time";
 import type { Commitment, DateKey, Minutes, Preferences, ScheduleBlock, Task, UnscheduledNote } from "../domain/types";
+import { t } from "../i18n";
 import { newId, nowIso } from "../persistence/repository";
 
 export interface PlanningState {
@@ -35,7 +37,7 @@ export interface Clock {
 export function commitmentsOn(date: DateKey, commitments: Commitment[]): Commitment[] {
   const wd = weekdayOf(date);
   return commitments
-    .filter((c) => (c.date ? c.date === date : (c.weekdays & (1 << wd)) !== 0))
+    .filter((c) => (c.date ? c.date === date : (c.weekdays & (1 << wd)) !== 0 && (!c.from || date >= c.from)))
     .sort((a, b) => a.start - b.start);
 }
 
@@ -55,7 +57,7 @@ export function isKept(b: ScheduleBlock, date: DateKey, clock: Clock): boolean {
 
 /** Busy time for `date`: commitments plus kept task blocks. */
 export function busyFor(state: PlanningState, date: DateKey, clock: Clock, excludeIds: Set<string> = new Set()): BusyBlock[] {
-  const titleOf = (id: string | null) => state.tasks.find((t) => t.id === id)?.title ?? "Task";
+  const titleOf = (id: string | null) => state.tasks.find((x) => x.id === id)?.title ?? t.fallbackTask;
   const busy: BusyBlock[] = commitmentsOn(date, state.commitments).map((c) => ({
     start: c.start,
     end: c.end,
@@ -179,9 +181,8 @@ export function proposePlan(state: PlanningState, date: DateKey, clock: Clock): 
   const taskCount = result.blocks.filter((b) => b.kind === "task").length;
   const backlog = result.unscheduled.length;
   const summary = result.window
-    ? `${taskCount} session${taskCount === 1 ? "" : "s"} · ${formatDuration(result.scheduledMin)} of ${formatDuration(result.availableMin)} free time used` +
-      (backlog ? ` · ${backlog} left in backlog` : "")
-    : (result.unscheduled[0]?.message ?? "Nothing to plan.");
+    ? encodeParts({ k: "proposal", sessions: taskCount, scheduled: result.scheduledMin, available: result.availableMin, backlog })
+    : (result.unscheduled[0]?.message ?? "");
   return { result, blocks: toBlocks(date, result.blocks, true), replaces, summary };
 }
 
@@ -192,7 +193,7 @@ export function acceptChanges(state: PlanningState, date: DateKey, clock: Clock)
   const kept = liveBlocks(state, date).filter((b) => isKept(b, date, clock));
   const overlaps = findOverlaps(proposal, [...kept, ...commitmentsOn(date, state.commitments)]);
   if (overlaps.length) {
-    throw new PlanningError("The day changed since this plan was proposed. Generate a new proposal.");
+    throw new PlanningError(t.errDayChanged);
   }
   return {
     insert: [],
@@ -215,7 +216,7 @@ export interface Reflow {
  * commitment, edited hours). Only tasks already on the plan are reshuffled;
  * pinned blocks stay unless they now collide with a commitment.
  */
-export function reflowDay(state: PlanningState, date: DateKey, clock: Clock, trigger: string): Reflow {
+export function reflowDay(state: PlanningState, date: DateKey, clock: Clock, trigger: Trigger): Reflow {
   const live = liveBlocks(state, date);
   const commitments = commitmentsOn(date, state.commitments);
   // A pinned block yields to commitments and to work that already happened or is running.
@@ -286,8 +287,8 @@ export function validateMove(
   duration: Minutes,
 ): MoveResult {
   const block = state.blocks.find((b) => b.id === blockId);
-  if (!block) throw new PlanningError("That block no longer exists.");
-  if (duration < 5) throw new PlanningError("A block must be at least 5 minutes long.");
+  if (!block) throw new PlanningError(t.errBlockGone);
+  if (duration < 5) throw new PlanningError(t.errBlockShort);
   const others: (Interval & { title: string })[] = [
     ...commitmentsOn(block.date, state.commitments).map((c) => ({ start: c.start, end: c.end, title: c.title })),
     ...state.blocks
@@ -297,20 +298,20 @@ export function validateMove(
         // A proposed block also has to clear live blocks the proposal won't replace.
         return block.proposed && (b.state !== "planned" || b.pinned);
       })
-      .map((b) => ({ start: b.start, end: b.end, title: state.tasks.find((t) => t.id === b.taskId)?.title ?? "Break" })),
+      .map((b) => ({ start: b.start, end: b.end, title: state.tasks.find((x) => x.id === b.taskId)?.title ?? t.breakLabel })),
   ];
   const start = Math.max(0, Math.min(24 * 60 - duration, Math.round(desiredStart / 5) * 5));
   const clash = conflictsFor(start, start + duration, others.map((o) => ({ ...o, kind: "commitment" as const })));
   if (!clash.length) return { start, end: start + duration, snapped: false, message: null };
   const alt = nearestFreeStart(start, duration, others);
   if (alt == null) {
-    throw new PlanningError(`There is no free ${formatDuration(duration)} slot on this day.`);
+    throw new PlanningError(t.errNoSlot(formatDuration(duration)));
   }
   return {
     start: alt,
     end: alt + duration,
     snapped: true,
-    message: `“${clash[0].title}” is at ${formatClock(clash[0].start)}–${formatClock(clash[0].end)}, so the block moved to ${formatClock(alt)}.`,
+    message: t.snapMsg(clash[0].title, formatClock(clash[0].start), formatClock(clash[0].end), formatClock(alt)),
   };
 }
 

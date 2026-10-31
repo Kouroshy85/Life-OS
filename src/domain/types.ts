@@ -9,20 +9,7 @@ export type DateKey = string;
 export type Minutes = number;
 
 export type Priority = 1 | 2 | 3 | 4;
-export const PRIORITY_LABEL: Record<Priority, string> = {
-  1: "Low",
-  2: "Medium",
-  3: "High",
-  4: "Critical",
-};
-
 export type Energy = "low" | "medium" | "high";
-export const ENERGY_LABEL: Record<Energy, string> = {
-  low: "Low energy",
-  medium: "Medium energy",
-  high: "Deep focus",
-};
-
 export type TaskStatus = "todo" | "in_progress" | "done" | "skipped";
 
 /** Where a plan (or a task) came from. Never claim "ai" unless a model actually answered. */
@@ -91,6 +78,75 @@ export interface Task {
 
 export type CommitmentKind = "commitment" | "break";
 
+export type PlanType = "default" | "goal" | "event";
+
+/** Something locked into the user's week. See domain/plans.ts for the priority rules. */
+export interface Plan {
+  id: string;
+  type: PlanType;
+  title: string;
+  description: string;
+  /** Bitmask for repeating plans: bit 0 = Sunday … bit 6 = Saturday. */
+  weekdays: number;
+  /** Specific dates for one-time plans; null means it repeats on `weekdays`. */
+  dates: DateKey[] | null;
+  /** A repeating plan doesn't apply to weeks before this date. */
+  validFrom: DateKey | null;
+  start: Minutes;
+  end: Minutes;
+  goalId: string | null;
+  isBreak: boolean;
+  isSample: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NoteUrgency = 1 | 2 | 3;
+
+export interface Note {
+  id: string;
+  title: string;
+  description: string;
+  urgency: NoteUrgency;
+  /** Local date and time as YYYY-MM-DDTHH:MM, or null for no reminder. */
+  remindAt: string | null;
+  reminded: boolean;
+  createdAt: string;
+}
+
+export interface Dream {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  icon: string;
+  createdAt: string;
+}
+
+export interface Song {
+  id: string;
+  playlistId: string;
+  title: string;
+  artist: string;
+  /** File extension; the audio itself is stored on disk under the song's id. */
+  ext: string;
+  sizeBytes: number;
+  durationSec: number;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface UserQuote {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface Commitment {
   id: string;
   title: string;
@@ -99,6 +155,8 @@ export interface Commitment {
   date: DateKey | null;
   /** Bitmask: bit 0 = Sunday … bit 6 = Saturday. Used when `date` is null. */
   weekdays: number;
+  /** A repeating commitment doesn't apply before this date. */
+  from?: DateKey | null;
   start: Minutes;
   end: Minutes;
   createdAt: string;
@@ -118,6 +176,11 @@ export interface Preferences {
   /** Tasks longer than any free slot may be split into sessions of at least this length. */
   minSessionMin: Minutes;
   defaultEstimateMin: Minutes;
+  /** Optional sleep schedule; nothing is recommended inside it. */
+  sleepStart: Minutes | null;
+  wakeTime: Minutes | null;
+  /** Keep an hour clear around default plans when working out free time. */
+  planGap: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -130,6 +193,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   breakLengthMin: 15,
   minSessionMin: 25,
   defaultEstimateMin: 45,
+  sleepStart: null,
+  wakeTime: null,
+  planGap: true,
 };
 
 export type BlockState = "planned" | "in_progress" | "done" | "skipped";

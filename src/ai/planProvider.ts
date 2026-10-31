@@ -8,7 +8,8 @@
  * never presented as model output.
  */
 
-import { compileGoal, sanitizePlan, type CompiledPlan, type GoalRequest } from "../domain/goalCompiler";
+import { compileGoal, planLanguage, sanitizePlan, type CompiledPlan, type GoalRequest } from "../domain/goalCompiler";
+import { t } from "../i18n";
 import type { AiSettings } from "../persistence/repository";
 
 export interface CompileOutcome {
@@ -22,7 +23,7 @@ export function aiConfigured(ai: AiSettings): boolean {
 }
 
 export function aiStatusLabel(ai: AiSettings): string {
-  return aiConfigured(ai) ? `Claude (${ai.model})` : "Built-in planner (no AI configured)";
+  return aiConfigured(ai) ? t.aiStatusOn(ai.model) : t.aiStatusOff;
 }
 
 const SYSTEM = `You turn a person's personal goal into a realistic, editable plan for a local planning app.
@@ -31,6 +32,10 @@ that start with a verb and could each be finished in one sitting (15–240 minut
 priority: 1 = low, 2 = medium, 3 = high, 4 = critical. energy: "low", "medium" or "high" (deep focus).
 deadline: an ISO date (YYYY-MM-DD) after today for the milestone, or null.
 Keep titles short (under 90 characters). Use the notes field for assumptions worth showing the user.`;
+
+const SYSTEM_FA = `Write every title, description, task and note in natural, spoken Persian, the way a friend would say it:
+informal second person and colloquial forms ("می‌خوای", "رو", "شه"), with proper half-spaces. Avoid formal, bookish or
+marketing language ("لطفاً", "می‌باشد", "جهت", "نمایید").`;
 
 async function compileWithClaude(req: GoalRequest, ai: AiSettings, description: string): Promise<CompiledPlan> {
   const [{ default: Anthropic }, { zodOutputFormat }, { z }] = await Promise.all([
@@ -71,7 +76,7 @@ async function compileWithClaude(req: GoalRequest, ai: AiSettings, description: 
   const response = await client.messages.parse({
     model: ai.model.trim(),
     max_tokens: 16000,
-    system: SYSTEM,
+    system: planLanguage(req.text, req.lang) === "fa" ? `${SYSTEM}\n${SYSTEM_FA}` : SYSTEM,
     messages: [
       {
         role: "user",
@@ -90,10 +95,10 @@ async function compileWithClaude(req: GoalRequest, ai: AiSettings, description: 
   });
 
   if (response.stop_reason === "refusal") {
-    throw new Error("The model declined this request.");
+    throw new Error(t.aiDeclined);
   }
   if (response.stop_reason === "max_tokens" || !response.parsed_output) {
-    throw new Error("The model's answer was incomplete.");
+    throw new Error(t.aiIncomplete);
   }
   return sanitizePlan(response.parsed_output, req, "ai", response.model);
 }
@@ -108,24 +113,24 @@ export async function compilePlan(req: GoalRequest, ai: AiSettings, opts: { useA
     const message = describeError(e);
     return {
       plan: compileGoal(req),
-      fallbackReason: `Claude couldn't be reached (${message}). This plan was made by the built-in planner instead.`,
+      fallbackReason: t.aiFallback(message),
     };
   }
 }
 
 function describeError(e: unknown): string {
   const status = (e as { status?: number })?.status;
-  if (status === 401) return "the API key was rejected";
-  if (status === 404) return "the model id was not found";
-  if (status === 429) return "rate limited";
-  if (status && status >= 500) return "the service is unavailable";
-  if (e instanceof Error && /fetch|network/i.test(e.message)) return "no network connection";
-  return e instanceof Error ? e.message.slice(0, 120).replace(/[.\s]+$/, "") : "unknown error";
+  if (status === 401) return t.aiKeyRejected;
+  if (status === 404) return t.aiModelMissing;
+  if (status === 429) return t.aiRateLimited;
+  if (status && status >= 500) return t.aiUnavailable;
+  if (e instanceof Error && /fetch|network|connection/i.test(e.message)) return t.aiNoNetwork;
+  return e instanceof Error ? e.message.slice(0, 120).replace(/[.\s]+$/, "") : t.aiUnknown;
 }
 
 /** Minimal request to confirm the key and model work. */
 export async function testConnection(ai: AiSettings): Promise<{ ok: boolean; message: string }> {
-  if (!aiConfigured(ai)) return { ok: false, message: "Add an API key and model first." };
+  if (!aiConfigured(ai)) return { ok: false, message: t.aiAddKey };
   try {
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = new Anthropic({ apiKey: ai.apiKey.trim(), dangerouslyAllowBrowser: true, maxRetries: 0 });
@@ -135,8 +140,8 @@ export async function testConnection(ai: AiSettings): Promise<{ ok: boolean; mes
       max_tokens: 1,
       messages: [{ role: "user", content: "ping" }],
     });
-    return { ok: true, message: `Connected — ${response.model} is available.` };
+    return { ok: true, message: t.aiConnected(response.model) };
   } catch (e) {
-    return { ok: false, message: `Connection failed: ${describeError(e)}.` };
+    return { ok: false, message: t.aiFailed(describeError(e)) };
   }
 }

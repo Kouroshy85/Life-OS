@@ -86,6 +86,39 @@ Key decisions:
 
 Overdue tasks go first with a warning, and same-day deadlines that can't be met are flagged rather than dropped. Hand-moved blocks are pinned and stay put, unless a commitment or running task collides with them. Dragging can never create an overlap: the block snaps to the nearest free slot and tells you why.
 
+## Your week
+
+Everything you lock in is a **plan**, in one of three colours. Priority decides who wins a time slot: **default plans, then goals, then events, then free time**.
+
+- **Planner** lists every plan, with add, edit and delete, each done one question at a time. The earlier day timeline is one switch away.
+- **This week's plan** is the grid: seven rows, two-hour columns, for any week, month or year. "When am I free?" turns the gaps into cards.
+- **Goals** build weekly sessions from your real free time. They avoid default and goal plans, use free time first, and can sit over an event only if they have to.
+- **Settings → Sleep schedule** is optional. Nothing is suggested while you sleep, or between 01:00 and 04:00 ever. With no waking time, the day starts at 06:00 and can run until 01:00.
+- Plans have to finish on the day they start.
+
+## Relax and My dreams
+
+**Relax** covers the whole screen: music on the left, a countdown on the right, a quote at the bottom. Songs are copied into the app data folder in chunks, so the progress bar is real, and files are checked by their contents, so a renamed non-audio file is refused. Accepted: MP3, M4A, AAC, WAV, FLAC, OGG, up to 500 MB each. Built-in quotes live in `relaxQuotes` in `src/i18n/en.ts` and `fa.ts`; anyone can add or remove quotes in **Settings → Relax quotes**.
+
+**My dreams** is a list of what you want to make real, saved as cards.
+
+## Themes
+
+Seven themes change every colour, shadow and glow, plus an illustrated scene behind the app: Default, Jungle, Shadow, Strawberry dreams, Neutral elegance, Sky and Wine. Switch from the sidebar or **Settings → Theme**.
+
+Palettes live in `src/domain/themes.ts`. Stylesheets only use the tokens they fill in, and tests fail if a theme's text is hard to read or a raw colour slips into a stylesheet. Scenes are in `src/features/shell/ThemeScene.tsx`.
+
+## Languages
+
+Life OS runs in English and Persian. Switch from the sidebar or from **Settings → Language**; the choice is remembered.
+
+Persian is a full right-to-left layout with the Vazirmatn font, Persian digits and the Solar Hijri calendar. The wording is deliberately casual and spoken, not formal. Dates are still stored as Gregorian, so switching language never changes your data.
+
+- **Follows the language:** the interface and every scheduling explanation, including plans made earlier, because explanations are stored as data and rendered when shown.
+- **Stays as written:** goals and tasks, including generated plans. A plan is written in the language of the goal if that's Persian, otherwise in the app's current language.
+
+To add or change wording, edit `src/i18n/en.ts` and `src/i18n/fa.ts`. TypeScript and a test flag any string missing from either file.
+
 ## Keyboard
 
 | Keys | Action |
@@ -93,7 +126,7 @@ Overdue tasks go first with a warning, and same-day deadlines that can't be met 
 | `Ctrl 1` / `2` / `3` | Today / Goals / Planner |
 | `Ctrl ,` | Settings |
 | `Ctrl N` | New goal |
-| `←` / `→` | Previous / next day (Planner) |
+| `←` / `→` | Previous / next day (Planner; mirrored in Persian) |
 | `T` / `P` | Jump to today / propose a plan (Planner) |
 | `↑` / `↓` on a block | Move 5 min (`Shift`: 15 min, `Alt`: resize) |
 | `Space` then `↑` / `↓` on a task handle | Reorder a task |

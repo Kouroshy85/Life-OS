@@ -1,20 +1,33 @@
 import { create } from "zustand";
 import { compilePlan, type CompileOutcome } from "../ai/planProvider";
 import { compileGoal, type CompiledPlan, type GoalRequest } from "../domain/goalCompiler";
+import type { Trigger } from "../domain/explain";
 import { planRevision, type RevisionPlan } from "../domain/revision";
-import { formatClock, formatDuration, minutesOfDay, toDateKey } from "../domain/time";
+import { prependPart, encodeParts } from "../domain/explain";
+import { replanGoalSessions, type GoalSession } from "../domain/goalPlanner";
+import { getLang, setLang, weekStartDay, type Lang } from "../domain/locale";
+import { dayBit, weekDates } from "../domain/plans";
+import { hasLetters } from "../domain/text";
+import { DEFAULT_THEME, themeById, themeTokens, type ThemeId } from "../domain/themes";
+import { dateTimeKey, formatClock, formatDuration, minutesOfDay, toDateKey } from "../domain/time";
+import { explain, t } from "../i18n";
 import type {
-  Commitment,
   DateKey,
+  Dream,
+  Playlist,
+  Song,
   Goal,
   Milestone,
+  Note,
+  Plan,
   Preferences,
   Task,
   TaskStatus,
 } from "../domain/types";
-import { openDefaultDriver, type SqlStatement } from "../persistence/driver";
+import { audioStore } from "../persistence/audioStore";
+import { isTauri, openDefaultDriver, type SqlStatement } from "../persistence/driver";
 import { migrate } from "../persistence/migrations";
-import { makeTask, newId, nowIso, Repository, type AiSettings, type Snapshot } from "../persistence/repository";
+import { makePlan, makeTask, newId, nowIso, Repository, type AiSettings, type Snapshot } from "../persistence/repository";
 import {
   acceptChanges,
   commitmentsOn,
@@ -28,7 +41,8 @@ import {
   type Clock,
 } from "./planning";
 
-export type View = "today" | "goals" | "planner" | "settings";
+export type View = "today" | "week" | "goals" | "planner" | "dreams" | "settings";
+export type PlannerMode = "plans" | "day";
 
 export interface Toast {
   id: string;
@@ -47,6 +61,65 @@ interface AppState extends Snapshot {
   plannerDate: DateKey;
   toasts: Toast[];
   composerOpen: boolean;
+  plannerMode: PlannerMode;
+  /** A note whose reminder just came due, shown as a popup. */
+  reminderNote: Note | null;
+  relaxPickerOpen: boolean;
+  relaxSession: { title: string; minutes: number } | null;
+  relaxClosing: boolean;
+  lang: Lang;
+  theme: ThemeId;
+}
+
+const LANG_KEY = "life-os.lang";
+
+/** Applies a language to the formatters and the document (reading direction and font). */
+function applyLang(lang: Lang) {
+  setLang(lang);
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";
+  try {
+    localStorage.setItem(LANG_KEY, lang);
+  } catch {
+    // Only a first-paint convenience; the database holds the real setting.
+  }
+}
+
+const THEME_KEY = "life-os.theme";
+
+/** Fills every colour token from a theme and tells the window whether it's light or dark. */
+function applyTheme(id: ThemeId) {
+  const theme = themeById(id);
+  const root = document.documentElement;
+  root.dataset.theme = theme.id;
+  root.classList.toggle("scened", theme.id !== DEFAULT_THEME);
+  root.classList.toggle("lit", theme.scheme === "light");
+  root.style.colorScheme = theme.scheme;
+  for (const [token, value] of Object.entries(themeTokens(theme))) root.style.setProperty(token, value);
+  try {
+    localStorage.setItem(THEME_KEY, theme.id);
+  } catch {
+    // Only a first-paint convenience; the database holds the real setting.
+  }
+  if (isTauri()) {
+    void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => getCurrentWindow().setTheme(theme.scheme)).catch(() => undefined);
+  }
+}
+
+function initialTheme(): ThemeId {
+  try {
+    return themeById(localStorage.getItem(THEME_KEY)).id;
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
+
+function initialLang(): Lang {
+  try {
+    return localStorage.getItem(LANG_KEY) === "fa" ? "fa" : "en";
+  } catch {
+    return "en";
+  }
 }
 
 const emptySnapshot = (): Snapshot => ({
@@ -54,7 +127,13 @@ const emptySnapshot = (): Snapshot => ({
   milestones: [],
   projects: [],
   tasks: [],
+  plans: [],
   commitments: [],
+  notes: [],
+  dreams: [],
+  playlists: [],
+  songs: [],
+  userQuotes: [],
   blocks: [],
   dayPlans: {},
   skips: {},
@@ -69,6 +148,9 @@ const emptySnapshot = (): Snapshot => ({
     breakLengthMin: 15,
     minSessionMin: 25,
     defaultEstimateMin: 45,
+    sleepStart: null,
+    wakeTime: null,
+    planGap: true,
   },
   ai: { provider: "none", apiKey: "", model: "claude-opus-5-5" },
   flags: {},
@@ -81,7 +163,7 @@ const readClock = (): Clock => {
 
 let repo: Repository | null = null;
 const R = () => {
-  if (!repo) throw new Error("Database is not ready yet.");
+  if (!repo) throw new Error(t.errDbNotReady);
   return repo;
 };
 
@@ -97,7 +179,22 @@ export const useApp = create<AppState>(() => ({
   plannerDate: readClock().today,
   toasts: [],
   composerOpen: false,
+  plannerMode: "plans",
+  reminderNote: null,
+  relaxPickerOpen: false,
+  relaxSession: null,
+  relaxClosing: false,
+  lang: "en",
+  theme: DEFAULT_THEME,
 }));
+
+if (typeof document !== "undefined") {
+  const lang = initialLang();
+  applyLang(lang);
+  const theme = initialTheme();
+  applyTheme(theme);
+  useApp.setState({ lang, theme });
+}
 
 const set = useApp.setState;
 const get = useApp.getState;
@@ -121,14 +218,14 @@ async function refresh() {
 }
 
 /** Runs a mutation, reloads state from the database, and reports failures. */
-async function mutate<T>(fn: () => Promise<T>, errorPrefix = "Couldn't save"): Promise<T | undefined> {
+async function mutate<T>(fn: () => Promise<T>): Promise<T | undefined> {
   try {
     const out = await fn();
     await refresh();
     return out;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    toast(e instanceof PlanningError ? msg : `${errorPrefix}: ${msg}`, "error");
+    toast(e instanceof PlanningError ? msg : t.errSave(msg), "error");
     await refresh().catch(() => undefined);
     return undefined;
   }
@@ -147,7 +244,11 @@ async function open() {
     await migrate(driver);
     repo = new Repository(driver);
     const [snap, location] = await Promise.all([repo.loadSnapshot(), repo.location()]);
-    set({ ...snap, status: "ready", engine: repo.engine, location, clock: readClock() });
+    const lang: Lang = snap.flags.language === "fa" ? "fa" : snap.flags.language === "en" ? "en" : getLang();
+    applyLang(lang);
+    const theme = snap.flags.theme ? themeById(snap.flags.theme).id : get().theme;
+    applyTheme(theme);
+    set({ ...snap, lang, theme, status: "ready", engine: repo.engine, location, clock: readClock() });
   } catch (e) {
     set({ status: "error", fatal: e instanceof Error ? e.message : String(e) });
   }
@@ -163,12 +264,125 @@ export function tick() {
       plannerDate: s.plannerDate === prev.today ? next.today : s.plannerDate,
     }));
   }
+  void checkReminders();
+}
+
+async function checkReminders() {
+  const s = get();
+  if (s.status !== "ready" || s.reminderNote) return;
+  const nowKey = dateTimeKey(s.clock.today, s.clock.nowMin);
+  const due = s.notes.find((n) => n.remindAt && !n.reminded && n.remindAt <= nowKey);
+  if (!due) return;
+  set({ reminderNote: due });
+  await mutate(() => R().saveNote({ ...due, reminded: true }));
+  if (isTauri()) {
+    // Flashes the taskbar so a reminder isn't missed behind other windows.
+    const { getCurrentWindow, UserAttentionType } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().requestUserAttention(UserAttentionType.Informational).catch(() => undefined);
+  }
+}
+
+export const dismissReminder = () => set({ reminderNote: null });
+
+export async function saveNote(note: Note) {
+  const ok = await mutate(async () => {
+    await R().saveNote(note);
+    return true;
+  });
+  return !!ok;
+}
+
+// ---- dreams
+
+export async function saveDream(dream: Dream) {
+  const ok = await mutate(async () => {
+    await R().saveDream(dream);
+    return true;
+  });
+  return !!ok;
+}
+
+export async function deleteDream(id: string) {
+  await mutate(() => R().deleteDream(id));
+  toast(t.toastDreamDeleted);
+}
+
+// ---- relax
+
+export const openRelaxPicker = () => set({ relaxPickerOpen: true });
+
+export function startRelax(title: string, minutes: number) {
+  set({ relaxPickerOpen: false, relaxClosing: false, relaxSession: { title, minutes } });
+}
+
+/** Plays the exit animation, then removes the screen (which stops the music). */
+export function leaveRelax() {
+  if (get().relaxClosing) return;
+  set({ relaxClosing: true });
+  setTimeout(() => set({ relaxSession: null, relaxClosing: false }), 460);
+}
+
+export const savePlaylist = (playlist: Playlist) => mutate(() => R().savePlaylist(playlist));
+
+export const addSong = (song: Song) => mutate(() => R().saveSong(song));
+
+export async function deleteSong(song: Song) {
+  await mutate(() => R().deleteSong(song.id));
+  await audioStore().remove(song.id, song.ext).catch(() => undefined);
+}
+
+export async function deletePlaylist(id: string) {
+  const songs = get().songs.filter((x) => x.playlistId === id);
+  await mutate(() => R().deletePlaylist(id));
+  await Promise.all(songs.map((x) => audioStore().remove(x.id, x.ext).catch(() => undefined)));
+}
+
+// ---- quotes
+
+/** Built-in quotes the user has removed. */
+export function hiddenQuotes(flags: Record<string, string>): string[] {
+  try {
+    const parsed = JSON.parse(flags.hiddenQuotes ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function addQuote(text: string) {
+  await mutate(() => R().saveQuote({ id: newId(), text: text.trim(), createdAt: nowIso() }));
+}
+
+export const deleteQuote = (id: string) => mutate(() => R().deleteQuote(id));
+
+export const setHiddenQuotes = (list: string[]) => mutate(() => R().setFlag("hiddenQuotes", JSON.stringify(list)));
+
+export async function deleteNote(id: string) {
+  await mutate(() => R().deleteNote(id));
+  toast(t.toastNoteDeleted);
+}
+
+export async function setLanguage(lang: Lang) {
+  applyLang(lang);
+  set({ lang });
+  await mutate(() => R().setFlag("language", lang));
+}
+
+export async function setTheme(id: ThemeId) {
+  // Colours glide instead of snapping, only during the switch so normal use stays snappy.
+  const root = document.documentElement;
+  root.classList.add("theme-changing");
+  setTimeout(() => root.classList.remove("theme-changing"), 600);
+  applyTheme(id);
+  set({ theme: id });
+  await mutate(() => R().setFlag("theme", id));
 }
 
 export const navigate = (view: View) => set({ view });
 export const selectGoal = (id: string | null) => set({ selectedGoalId: id, view: "goals" });
-export const setPlannerDate = (date: DateKey) => set({ plannerDate: date });
-export const openComposer = (open: boolean) => set({ composerOpen: open, ...(open ? { view: "goals" as View } : {}) });
+export const setPlannerDate = (date: DateKey) => set({ plannerDate: date, plannerMode: "day" });
+export const setPlannerMode = (plannerMode: PlannerMode) => set({ plannerMode });
+export const openComposer = (open: boolean) => set({ composerOpen: open });
 
 const planningState = () => {
   const s = get();
@@ -188,42 +402,68 @@ function blockStatements(changes: BlockChanges): SqlStatement[] {
 
 export function compilePreview(req: Omit<GoalRequest, "today">, useAi: boolean, description: string): Promise<CompileOutcome> {
   const s = get();
-  return compilePlan({ ...req, today: s.clock.today }, s.ai, { useAi, description });
+  return compilePlan({ ...req, today: s.clock.today, lang: getLang() }, s.ai, { useAi, description });
 }
 
-export async function createGoal(plan: CompiledPlan, description: string) {
+/** Creates a goal together with the weekly sessions planned for it. */
+export async function createGoalWithSessions(plan: CompiledPlan, sessions: GoalSession[]) {
+  const s = get();
+  const validFrom = weekDates(s.clock.today, weekStartDay())[0];
   const id = await mutate(async () => {
-    const order = get().goals.length;
-    return R().createGoalFromPlan({ ...plan, description: description.trim() || plan.description }, { sortOrder: order });
+    const r = R();
+    const goalId = await r.createGoalFromPlan(plan, { sortOrder: s.goals.length });
+    try {
+      const rows = sessions.map((x) =>
+        makePlan({ type: "goal", title: plan.title, description: plan.description, goalId, weekdays: dayBit(x.weekday), validFrom, start: x.start, end: x.end }),
+      );
+      await r.run(rows.map((p) => r.planUpsert(p)));
+    } catch (e) {
+      // A goal without its sessions would be half a plan.
+      await r.deleteGoal(goalId);
+      throw e;
+    }
+    return goalId;
   });
-  if (id) {
-    set({ selectedGoalId: id, composerOpen: false });
-    toast("Goal created — every item is editable.", "success");
-  }
+  if (id) set({ selectedGoalId: id });
   return id;
-}
-
-export async function createBlankGoal(title: string) {
-  const plan: CompiledPlan = {
-    title: title.trim(),
-    description: "",
-    targetDate: null,
-    milestones: [{ title: "First milestone", description: "", deadline: null, projects: [{ title: "Tasks", tasks: [] }] }],
-    source: "manual",
-    model: null,
-    archetype: "Manual",
-    notes: [],
-  };
-  return createGoal(plan, "");
 }
 
 export const updateGoal = (id: string, patch: Partial<Pick<Goal, "title" | "description" | "targetDate" | "archived">>) =>
   mutate(() => R().updateGoal(id, patch));
 
+/** Lowers a goal's weekly hours and re-plans its sessions. Returns a message if that isn't possible. */
+export async function decreaseGoalHours(goal: Goal, hours: number): Promise<string | null> {
+  const s = get();
+  const result = replanGoalSessions({ goalId: goal.id, hours, plans: s.plans, prefs: s.prefs, today: s.clock.today });
+  if (!result.ok) return t.goalFullText(formatDuration(result.neededMin), formatDuration(result.placedMin));
+  const validFrom = weekDates(s.clock.today, weekStartDay())[0];
+  const previous = s.plans.find((p) => p.goalId === goal.id);
+  const rows = result.sessions.map((x) =>
+    makePlan({
+      type: "goal",
+      title: previous?.title ?? goal.title,
+      description: previous?.description ?? goal.description,
+      goalId: goal.id,
+      weekdays: dayBit(x.weekday),
+      validFrom,
+      start: x.start,
+      end: x.end,
+      isSample: goal.isSample,
+    }),
+  );
+  const ok = await mutate(async () => {
+    await R().replaceGoalSessions(goal.id, rows);
+    return true;
+  });
+  if (!ok) return t.errReplan;
+  toast(t.toastHoursDecreased(formatDuration(result.placedMin)), "success");
+  return null;
+}
+
 export async function deleteGoal(id: string) {
   await mutate(() => R().deleteGoal(id));
   set((s) => ({ selectedGoalId: s.selectedGoalId === id ? null : s.selectedGoalId }));
-  toast("Goal deleted.");
+  toast(t.toastGoalDeleted);
 }
 
 export interface RevisionPreview {
@@ -234,7 +474,7 @@ export interface RevisionPreview {
 export async function previewRevision(goalId: string, text: string, opts: { targetDate: DateKey | null; hoursPerWeek: number; useAi: boolean; description: string }): Promise<RevisionPreview> {
   const s = get();
   const outcome = await compilePlan(
-    { text, targetDate: opts.targetDate, hoursPerWeek: opts.hoursPerWeek, today: s.clock.today },
+    { text, targetDate: opts.targetDate, hoursPerWeek: opts.hoursPerWeek, today: s.clock.today, lang: getLang() },
     s.ai,
     { useAi: opts.useAi, description: opts.description },
   );
@@ -257,13 +497,13 @@ export async function applyRevision(goalId: string, preview: RevisionPreview, ne
     await R().reviseGoal(goalId, preview.revision, preview.outcome.plan);
     if (newTitle.trim()) await R().updateGoal(goalId, { title: newTitle.trim() });
   });
-  toast(`Plan revised — kept ${preview.revision.summary.kept} item${preview.revision.summary.kept === 1 ? "" : "s"} you worked on.`, "success");
+  toast(t.toastRevised(preview.revision.summary.kept), "success");
 }
 
 // ---- milestones & projects -------------------------------------------------------------------
 
 export const addMilestone = (goalId: string, title: string) =>
-  mutate(() => R().createMilestone(goalId, title.trim() || "New milestone", get().milestones.filter((m) => m.goalId === goalId).length));
+  mutate(() => R().createMilestone(goalId, title.trim() || t.newMilestone, get().milestones.filter((m) => m.goalId === goalId).length));
 
 export const updateMilestone = (id: string, patch: Partial<Pick<Milestone, "title" | "description" | "deadline">>) =>
   mutate(() => R().updateMilestone(id, patch));
@@ -274,7 +514,7 @@ export const reorder = (table: "milestones" | "projects" | "tasks" | "goals", id
   mutate(() => R().reorder(table, ids));
 
 export const addProject = (milestoneId: string, title: string) =>
-  mutate(() => R().createProject(milestoneId, title.trim() || "New project", get().projects.filter((p) => p.milestoneId === milestoneId).length));
+  mutate(() => R().createProject(milestoneId, title.trim() || t.newProject, get().projects.filter((p) => p.milestoneId === milestoneId).length));
 
 export const renameProject = (id: string, title: string) => mutate(() => R().renameProject(id, title));
 export const deleteProject = (id: string) => mutate(() => R().deleteProject(id));
@@ -283,8 +523,8 @@ export const deleteProject = (id: string) => mutate(() => R().deleteProject(id))
 
 export async function addTask(partial: Partial<Task> & { title: string }) {
   const title = partial.title.trim();
-  if (!title) {
-    toast("A task needs a title.", "error");
+  if (!title || !hasLetters(title)) {
+    toast(title ? t.textNoLetters : t.errTaskTitle, "error");
     return;
   }
   const s = get();
@@ -302,11 +542,12 @@ export async function addTask(partial: Partial<Task> & { title: string }) {
 const CONTENT_FIELDS: (keyof Task)[] = ["title", "notes", "priority", "estimateMin", "deadline", "deadlineTime", "energy"];
 
 export function validateTaskPatch(patch: Partial<Task>): string | null {
-  if (patch.title !== undefined && !patch.title.trim()) return "A task needs a title.";
+  if (patch.title !== undefined && !patch.title.trim()) return t.errTaskTitle;
+  if (patch.title !== undefined && !hasLetters(patch.title)) return t.textNoLetters;
   if (patch.estimateMin !== undefined && (!Number.isFinite(patch.estimateMin) || patch.estimateMin < 5 || patch.estimateMin > 960)) {
-    return "Duration must be between 5 minutes and 16 hours.";
+    return t.errDuration;
   }
-  if (patch.deadlineTime != null && (patch.deadlineTime < 0 || patch.deadlineTime > 1440)) return "Invalid deadline time.";
+  if (patch.deadlineTime != null && (patch.deadlineTime < 0 || patch.deadlineTime > 1440)) return t.errDeadlineTime;
   return null;
 }
 
@@ -361,7 +602,7 @@ export async function sendToPlanner(ids: string[], inPlanner = true) {
     await r.run(ids.map((id) => r.taskPatchStatement(id, { inPlanner })));
     return ids.length;
   });
-  if (n && inPlanner) toast(`${n} task${n === 1 ? "" : "s"} added to the planner backlog.`, "success");
+  if (n && inPlanner) toast(t.toastAddedToBacklog(n), "success");
 }
 
 /** Converts a task into a scheduled block at the earliest free slot of `date`. */
@@ -375,7 +616,7 @@ export async function scheduleTask(taskId: string, date: DateKey) {
   const placed = result.blocks;
   if (!placed.some((b) => b.kind === "task")) {
     await mutate(() => r.run(stmts));
-    toast(`Added to the backlog — ${result.unscheduled[0]?.message ?? "no free slot on that day."}`, "info");
+    toast(t.toastBacklogFallback(explain(result.unscheduled[0]?.message) || t.noSlotThatDay), "info");
     return;
   }
   for (const p of placed) {
@@ -392,7 +633,7 @@ export async function scheduleTask(taskId: string, date: DateKey) {
         pinned: true,
         part: p.part,
         partCount: p.partCount,
-        reason: p.kind === "task" ? `Scheduled by you into the earliest free slot. ${p.reason}` : p.reason,
+        reason: p.kind === "task" ? prependPart({ k: "byYouSlot" }, p.reason) : p.reason,
         createdAt: nowIso(),
       }),
     );
@@ -400,19 +641,20 @@ export async function scheduleTask(taskId: string, date: DateKey) {
   stmts.push(r.dayPlanUpsert(date, { acceptedAt: nowIso() }));
   await mutate(() => r.run(stmts));
   const first = placed.find((b) => b.kind === "task")!;
-  toast(`Scheduled “${task.title}” at ${formatClock(first.start)}${date === s.clock.today ? " today" : ""}.`, "success");
+  toast(t.toastScheduled(task.title, formatClock(first.start), date === s.clock.today), "success");
 }
 
 // ---- preferences, commitments, AI -----------------------------------------------------------------------
 
 export function validatePrefs(p: Preferences): string | null {
-  if (p.workEnd <= p.workStart) return "Working hours must end after they start.";
-  if (p.focusEnd <= p.focusStart) return "Focus hours must end after they start.";
-  if (p.bufferMin < 0 || p.bufferMin > 60) return "Buffer must be between 0 and 60 minutes.";
-  if (p.breakAfterMin !== 0 && (p.breakAfterMin < 30 || p.breakAfterMin > 300)) return "Break interval must be 30–300 minutes, or 0 to disable.";
-  if (p.breakLengthMin < 5 || p.breakLengthMin > 60) return "Breaks must be 5–60 minutes.";
-  if (p.minSessionMin < 10 || p.minSessionMin > 180) return "Minimum session must be 10–180 minutes.";
-  if (p.defaultEstimateMin < 5 || p.defaultEstimateMin > 480) return "Default duration must be 5–480 minutes.";
+  if (p.sleepStart != null && p.wakeTime != null && p.sleepStart % 1440 === p.wakeTime % 1440) return t.errSleepSame;
+  if (p.workEnd <= p.workStart) return t.errWorkHours;
+  if (p.focusEnd <= p.focusStart) return t.errFocusHours;
+  if (p.bufferMin < 0 || p.bufferMin > 60) return t.errBuffer;
+  if (p.breakAfterMin !== 0 && (p.breakAfterMin < 30 || p.breakAfterMin > 300)) return t.errBreakAfter;
+  if (p.breakLengthMin < 5 || p.breakLengthMin > 60) return t.errBreakLength;
+  if (p.minSessionMin < 10 || p.minSessionMin > 180) return t.errMinSession;
+  if (p.defaultEstimateMin < 5 || p.defaultEstimateMin > 480) return t.errDefaultDuration;
   return null;
 }
 
@@ -423,39 +665,27 @@ export async function savePrefs(p: Preferences) {
     return false;
   }
   await mutate(() => R().savePreferences(p));
-  toast("Planning preferences saved.", "success");
+  toast(t.toastPrefsSaved, "success");
   return true;
 }
 
-export function validateCommitment(c: Commitment): string | null {
-  if (!c.title.trim()) return "Give the commitment a name.";
-  if (c.end <= c.start) return "The end time must be after the start time.";
-  if (!c.date && c.weekdays === 0) return "Choose at least one weekday, or a specific date.";
-  return null;
-}
-
-/** Saves a commitment and recalculates any affected plan from today onward. */
-export async function saveCommitment(c: Commitment) {
-  const error = validateCommitment(c);
-  if (error) {
-    toast(error, "error");
-    return false;
-  }
-  const isNew = !get().commitments.some((x) => x.id === c.id);
+/** Saves a plan and recalculates any day plan it now collides with. */
+export async function savePlan(plan: Plan, isNew: boolean) {
   const ok = await mutate(async () => {
-    await R().saveCommitment({ ...c, title: c.title.trim() });
+    await R().run([R().planUpsert(plan)]);
     return true;
   });
   if (!ok) return false;
-  await reflowAffected(`“${c.title.trim()}” ${isNew ? "was added" : "changed"} at ${formatClock(c.start)}`);
+  await reflowAffected({ t: isNew ? "added" : "changed", title: plan.title, at: plan.start });
   return true;
 }
 
-export async function deleteCommitment(id: string) {
-  await mutate(() => R().deleteCommitment(id));
+export async function deletePlan(id: string) {
+  await mutate(() => R().deletePlan(id));
+  toast(t.toastPlanDeleted);
 }
 
-async function reflowAffected(trigger: string) {
+async function reflowAffected(trigger: Trigger) {
   const s = get();
   const dates = [...new Set(s.blocks.filter((b) => !b.proposed && b.date >= s.clock.today).map((b) => b.date))];
   let moved = 0;
@@ -485,14 +715,14 @@ function mergeNotes(date: DateKey, fresh: Snapshot["dayPlans"][string]["notes"])
 
 function reflowMessage(moved: number, toBacklog: number) {
   const parts = [];
-  if (moved) parts.push(`${moved} block${moved === 1 ? "" : "s"} moved`);
-  if (toBacklog) parts.push(`${toBacklog} moved to the backlog`);
-  return parts.length ? `Plan recalculated: ${parts.join(", ")}.` : "Plan recalculated — nothing needed to move.";
+  if (moved) parts.push(t.reflowMoved(moved));
+  if (toBacklog) parts.push(t.reflowBacklog(toBacklog));
+  return parts.length ? t.reflowMsg(parts.join(t.reflowJoin)) : t.reflowNothing;
 }
 
 export async function saveAi(ai: AiSettings) {
   await mutate(() => R().saveAi(ai));
-  toast(ai.provider === "anthropic" ? "AI settings saved on this device." : "AI disabled — the built-in planner will be used.", "success");
+  toast(ai.provider === "anthropic" ? t.toastAiSaved : t.toastAiOff, "success");
 }
 
 // ---- day planning -------------------------------------------------------------------------------------
@@ -512,7 +742,7 @@ export async function proposeDay(date: DateKey) {
   ];
   await mutate(() => r.run(stmts));
   if (!proposal.blocks.length) {
-    toast(proposal.result.unscheduled[0]?.message ?? "Nothing to schedule — add tasks to the backlog first.", "info");
+    toast(explain(proposal.result.unscheduled[0]?.message) || t.nothingToSchedule, "info");
   }
 }
 
@@ -532,7 +762,7 @@ export async function acceptProposal(date: DateKey) {
         }),
       ]),
     );
-    toast("Plan accepted.", "success");
+    toast(t.toastAccepted, "success");
   } catch (e) {
     toast(e instanceof Error ? e.message : String(e), "error");
     await proposeDay(date);
@@ -559,9 +789,9 @@ export async function moveBlock(id: string, start: number, duration?: number) {
     const res = validateMove(planningState(), id, start, dur);
     if (res.start === block.start && res.end === block.end) return;
     const r = R();
-    const what = duration != null && duration !== block.end - block.start ? `Resized by you to ${formatDuration(dur)}` : `Moved by you to ${formatClock(res.start)}`;
+    const what = encodeParts(duration != null && duration !== block.end - block.start ? { k: "resizedByYou", dur } : { k: "movedByYou", at: res.start });
     await mutate(() =>
-      r.run([r.blockUpdate(id, { start: res.start, end: res.end, pinned: true, reason: `${what}. The planner will keep it here.` })]),
+      r.run([r.blockUpdate(id, { start: res.start, end: res.end, pinned: true, reason: what })]),
     );
     if (res.message) toast(res.message, "info");
   } catch (e) {
@@ -587,7 +817,7 @@ export async function startBlock(id: string) {
     r.eventStatement(task, "started", block.date),
   ];
   if (other) {
-    toast("Paused the other session that was in progress.", "info");
+    toast(t.toastPausedOther, "info");
     stmts.push(r.blockUpdate(other.id, { state: "planned" }));
   }
   await mutate(() => r.run(stmts));
@@ -616,10 +846,10 @@ export async function completeBlock(id: string) {
   await mutate(() => r.run(stmts));
   toast(
     laterParts.length
-      ? `Session done — ${laterParts.length} more planned.`
+      ? t.toastSessionDone(laterParts.length)
       : unfinished
-        ? `Session done — the rest of “${task.title}” is in the backlog.`
-        : `Completed “${task.title}”.`,
+        ? t.toastSessionRest(task.title)
+        : t.toastCompleted(task.title),
     "success",
   );
 }
@@ -647,7 +877,7 @@ export async function skipBlock(id: string) {
       r.eventStatement(task, "skipped_today", block.date),
     ]),
   );
-  toast(`Skipped “${task.title}” — it stays in the backlog.`);
+  toast(t.toastSkipped(task.title));
 }
 
 export async function reopenBlock(id: string) {
@@ -679,7 +909,7 @@ export async function extendBlock(id: string, minutes: number) {
   const newEnd = Math.min(24 * 60, block.end + minutes);
   const overlapsCommitment = commitmentsOn(block.date, s.commitments).find((c) => c.start < newEnd && block.end < c.end);
   if (overlapsCommitment) {
-    toast(`Extending would run into “${overlapsCommitment.title}” at ${formatClock(overlapsCommitment.start)}. Extended up to it instead.`, "info");
+    toast(t.toastExtendClamp(overlapsCommitment.title, formatClock(overlapsCommitment.start)), "info");
   }
   const end = overlapsCommitment ? Math.max(block.end, overlapsCommitment.start) : newEnd;
   if (end === block.end) return;
@@ -694,10 +924,10 @@ export async function extendBlock(id: string, minutes: number) {
   });
   if (!ok) return;
   const s2 = get();
-  const trigger = `“${task.title}” ran ${formatDuration(extra)} over`;
+  const trigger: Trigger = { t: "overrun", title: task.title, dur: extra };
   const rf = reflowDay(planningState(), block.date, s2.clock, trigger);
   if (!rf.changes.remove.length) {
-    toast(`Extended by ${formatDuration(extra)}.`, "success");
+    toast(t.toastExtended(formatDuration(extra)), "success");
     return;
   }
   await mutate(() => r.run([...blockStatements(rf.changes), r.dayPlanUpsert(block.date, { notes: mergeNotes(block.date, rf.notes) })]));
@@ -707,7 +937,7 @@ export async function extendBlock(id: string, minutes: number) {
 /** Re-flows the remaining blocks of a day in place (used after manual changes). */
 export async function reflowNow(date: DateKey) {
   const s = get();
-  const rf = reflowDay(planningState(), date, s.clock, "you asked to recalculate the rest of the day");
+  const rf = reflowDay(planningState(), date, s.clock, { t: "manual" });
   const r = R();
   await mutate(() => r.run([...blockStatements(rf.changes), r.dayPlanUpsert(date, { notes: mergeNotes(date, rf.notes) })]));
   toast(reflowMessage(rf.moved, rf.toBacklog));
@@ -720,34 +950,45 @@ export async function loadSampleData() {
   const today = s.clock.today;
   const ok = await mutate(async () => {
     const r = R();
-    const a = compileGoal({ text: "Become a better backend developer", targetDate: null, hoursPerWeek: 6, today });
-    const b = compileGoal({ text: "Prepare for my university exams", targetDate: null, hoursPerWeek: 8, today });
+    const lang = getLang();
+    const a = compileGoal({ text: t.sampleGoals[0], targetDate: null, hoursPerWeek: 6, today, lang });
+    const b = compileGoal({ text: t.sampleGoals[1], targetDate: null, hoursPerWeek: 8, today, lang });
     await r.createGoalFromPlan({ ...a, title: `${a.title}` }, { isSample: true, sortOrder: s.goals.length });
     await r.createGoalFromPlan({ ...b, title: `${b.title}` }, { isSample: true, sortOrder: s.goals.length + 1 });
     const standalone = [
-      makeTask({ title: "Reply to pending emails", estimateMin: 30, priority: 2, energy: "low", inPlanner: true, isSample: true }),
-      makeTask({ title: "Review this week's budget", estimateMin: 45, priority: 3, energy: "medium", inPlanner: true, isSample: true, deadline: today }),
-      makeTask({ title: "Draft project proposal", estimateMin: 120, priority: 4, energy: "high", inPlanner: true, isSample: true }),
+      makeTask({ title: t.sampleTasks[0], estimateMin: 30, priority: 2, energy: "low", inPlanner: true, isSample: true }),
+      makeTask({ title: t.sampleTasks[1], estimateMin: 45, priority: 3, energy: "medium", inPlanner: true, isSample: true, deadline: today }),
+      makeTask({ title: t.sampleTasks[2], estimateMin: 120, priority: 4, energy: "high", inPlanner: true, isSample: true }),
     ];
     for (const t of standalone) await r.createTask(t);
-    const ts = nowIso();
-    await r.saveCommitment({ id: "sample-lunch", title: "Lunch", kind: "break", date: null, weekdays: 0b0111110, start: 750, end: 795, createdAt: ts });
-    await r.saveCommitment({ id: "sample-sync", title: "Team sync", kind: "commitment", date: null, weekdays: 0b0101010, start: 600, end: 630, createdAt: ts });
+    const validFrom = weekDates(today, weekStartDay())[0];
+    await r.run([
+      r.planUpsert(makePlan({ type: "default", title: t.sampleLunch, weekdays: 0b0111110, validFrom, start: 750, end: 795, isBreak: true, isSample: true })),
+      r.planUpsert(makePlan({ type: "default", title: t.sampleSync, weekdays: 0b0101010, validFrom, start: 600, end: 630, isSample: true })),
+    ]);
     await r.setFlag("sampleLoaded", "1");
     return true;
   });
-  if (ok) toast("Sample data loaded. Remove it any time from Settings.", "success");
+  if (ok) toast(t.toastSampleLoaded, "success");
 }
 
 export async function removeSampleData() {
   await mutate(() => R().deleteSampleData());
-  toast("Sample data removed.");
+  toast(t.toastSampleRemoved);
 }
 
 export async function resetAll() {
-  await mutate(() => R().resetAll());
+  // The language is a device preference, not data, so it survives a reset.
+  const lang = getLang();
+  const theme = get().theme;
+  await mutate(async () => {
+    await R().resetAll();
+    await R().setFlag("language", lang);
+    await R().setFlag("theme", theme);
+  });
+  await audioStore().clear();
   set({ selectedGoalId: null });
-  toast("All data deleted.");
+  toast(t.toastAllDeleted);
 }
 
 export async function dismissWelcome() {

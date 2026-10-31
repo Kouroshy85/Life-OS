@@ -130,6 +130,88 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 2,
+    name: "plans and notes",
+    statements: [
+      `CREATE TABLE plans (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('default','goal','event')),
+        title TEXT NOT NULL CHECK (length(title) > 0),
+        description TEXT NOT NULL DEFAULT '',
+        weekdays INTEGER NOT NULL DEFAULT 0,
+        dates TEXT,
+        valid_from TEXT,
+        start_min INTEGER NOT NULL CHECK (start_min BETWEEN 0 AND 1440),
+        end_min INTEGER NOT NULL CHECK (end_min BETWEEN 0 AND 1440),
+        goal_id TEXT REFERENCES goals(id) ON DELETE CASCADE,
+        is_break INTEGER NOT NULL DEFAULT 0,
+        is_sample INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        CHECK (end_min > start_min),
+        CHECK (dates IS NOT NULL OR weekdays > 0)
+      )`,
+      `INSERT INTO plans (id, type, title, weekdays, dates, start_min, end_min, is_break, is_sample, created_at, updated_at)
+       SELECT id,
+              CASE WHEN date IS NULL THEN 'default' ELSE 'event' END,
+              title,
+              weekdays,
+              CASE WHEN date IS NULL THEN NULL ELSE '["' || date || '"]' END,
+              start_min,
+              end_min,
+              kind = 'break',
+              id LIKE 'sample-%',
+              created_at,
+              created_at
+       FROM commitments`,
+      `DROP TABLE commitments`,
+      `CREATE TABLE notes (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL CHECK (length(title) > 0),
+        description TEXT NOT NULL DEFAULT '',
+        urgency INTEGER NOT NULL DEFAULT 1 CHECK (urgency BETWEEN 1 AND 3),
+        remind_at TEXT,
+        reminded INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )`,
+    ],
+  },
+  {
+    version: 3,
+    name: "dreams, relax music and quotes",
+    statements: [
+      `CREATE TABLE dreams (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL CHECK (length(title) > 0),
+        body TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE TABLE playlists (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL CHECK (length(name) > 0),
+        icon TEXT NOT NULL DEFAULT 'music',
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE TABLE songs (
+        id TEXT PRIMARY KEY,
+        playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+        title TEXT NOT NULL CHECK (length(title) > 0),
+        artist TEXT NOT NULL DEFAULT '',
+        ext TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL DEFAULT 0,
+        duration_sec REAL NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX idx_songs_playlist ON songs(playlist_id, sort_order)`,
+      `CREATE TABLE quotes (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL CHECK (length(text) > 0),
+        created_at TEXT NOT NULL
+      )`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

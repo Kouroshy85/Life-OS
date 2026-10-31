@@ -74,7 +74,7 @@ ol {
 }
 
 ::selection {
-  background: rgba(139, 92, 246, 0.42);
+  background: rgb(var(--a500) / 0.42);
 }
 
 ::-webkit-scrollbar {
@@ -83,14 +83,14 @@ ol {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--ink) / 0.08);
   border-radius: 99px;
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.16);
+  background-color: rgb(var(--ink) / 0.16);
 }
 
 ::-webkit-scrollbar-track {
@@ -118,10 +118,9 @@ ol {
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  background:
-    radial-gradient(1200px 700px at 12% -10%, rgba(124, 58, 237, 0.22), transparent 60%),
-    radial-gradient(900px 600px at 105% 110%, rgba(91, 33, 182, 0.18), transparent 60%),
-    radial-gradient(700px 500px at 70% 10%, rgba(167, 139, 250, 0.06), transparent 70%),
+  background: radial-gradient(1200px 700px at 12% -10%, rgb(var(--a600) / 0.22), transparent 60%),
+    radial-gradient(900px 600px at 105% 110%, rgb(var(--a-deep) / 0.18), transparent 60%),
+    radial-gradient(700px 500px at 70% 10%, rgb(var(--a400) / 0.06), transparent 70%),
     var(--bg);
 }
 
@@ -136,18 +135,18 @@ ol {
 .ambient__orb--a {
   width: 520px;
   height: 520px;
-  left: -140px;
+  inset-inline-start: -140px;
   top: 18%;
-  background: radial-gradient(circle at 30% 30%, rgba(139, 92, 246, 0.55), rgba(76, 29, 149, 0));
+  background: radial-gradient(circle at 30% 30%, rgb(var(--a500) / 0.55), rgb(var(--a-deep) / 0));
   animation: drift-a 38s var(--ease) infinite alternate;
 }
 
 .ambient__orb--b {
   width: 420px;
   height: 420px;
-  right: 8%;
+  inset-inline-end: 8%;
   bottom: -160px;
-  background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.32), rgba(49, 46, 129, 0));
+  background: radial-gradient(circle at 50% 50%, rgb(var(--alt) / 0.32), rgb(var(--alt) / 0));
   animation: drift-b 46s var(--ease) infinite alternate;
 }
 

@@ -17,7 +17,9 @@
  */
 
 import { intersect, length, merge, subtract, totalLength, type Interval } from "./intervals";
-import { daysBetween, formatClock, formatDuration, formatShortDate, roundUpTo } from "./time";
+import { blockedOnCalendarDay } from "./availability";
+import { encodeParts, type DeadlineNote, type Part, type Trigger } from "./explain";
+import { daysBetween, roundUpTo } from "./time";
 import type {
   BlockState,
   DateKey,
@@ -68,8 +70,8 @@ export interface ScheduleInput {
   skippedToday?: string[];
   /** Start times from the plan being replaced, to explain moves. */
   previousStarts?: Record<string, Minutes>;
-  /** Why the plan is being recalculated, e.g. `"Write report" ran 20 min over`. */
-  trigger?: string;
+  /** Why the plan is being recalculated, e.g. a task that ran over. */
+  trigger?: Trigger;
 }
 
 export interface PlannedBlock {
@@ -153,27 +155,20 @@ export function rankTasks<T extends SchedulableTask>(tasks: T[], date: DateKey):
   });
 }
 
-function deadlinePhrase(task: SchedulableTask, date: DateKey, today: DateKey, urgency: Urgency): string | null {
+function deadlineNote(task: SchedulableTask, date: DateKey, today: DateKey, urgency: Urgency): DeadlineNote | null {
   if (!task.deadline) return null;
-  const at = task.deadlineTime != null ? ` at ${formatClock(task.deadlineTime)}` : "";
+  const at = task.deadlineTime;
   switch (urgency) {
     case "overdue":
-      return `deadline passed on ${formatShortDate(task.deadline)}`;
+      return { kind: "overdue", date: task.deadline };
     case "today":
-      return `due ${date === today ? "today" : "that day"}${at}`;
+      return { kind: date === today ? "today" : "thatDay", at };
     default: {
       const days = daysBetween(date, task.deadline);
-      return days === 1 ? `due tomorrow${at}` : `due in ${days} days`;
+      return days === 1 ? { kind: "tomorrow", at } : { kind: "inDays", n: days };
     }
   }
 }
-
-const PRIORITY_WORD: Record<Priority, string> = {
-  1: "Low priority",
-  2: "Medium priority",
-  3: "High priority",
-  4: "Critical priority",
-};
 
 export function computeWindow(input: Pick<ScheduleInput, "date" | "today" | "nowMin" | "prefs">):
   | { window: Interval; reason: null }
@@ -183,11 +178,11 @@ export function computeWindow(input: Pick<ScheduleInput, "date" | "today" | "now
     return {
       window: null,
       reason: "no_working_hours",
-      message: "Working hours are empty — set a start and end time in Planner settings.",
+      message: encodeParts({ k: "noHours" }),
     };
   }
   if (date < today) {
-    return { window: null, reason: "day_over", message: "This day has already passed." };
+    return { window: null, reason: "day_over", message: encodeParts({ k: "dayPassed" }) };
   }
   let start = prefs.workStart;
   if (date === today && input.nowMin != null) {
@@ -197,7 +192,7 @@ export function computeWindow(input: Pick<ScheduleInput, "date" | "today" | "now
     return {
       window: null,
       reason: "day_over",
-      message: `Your working hours ended at ${formatClock(prefs.workEnd)}. Plan tomorrow instead.`,
+      message: encodeParts({ k: "hoursEnded", end: prefs.workEnd }),
     };
   }
   return { window: { start, end: prefs.workEnd }, reason: null };
@@ -224,7 +219,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
       unscheduled.push({
         taskId: t.id,
         reason: "skipped_today",
-        message: "You skipped this today, so it stays in the backlog.",
+        message: encodeParts({ k: "skippedToday" }),
         remainingMin: remainingOf(t, covered),
       });
       continue;
@@ -265,6 +260,8 @@ export function schedule(input: ScheduleInput): ScheduleResult {
     start: b.start,
     end: b.kind === "task" ? b.end + prefs.bufferMin : b.end,
   }));
+  // Sleep and the 01:00–04:00 block apply whatever the working hours say.
+  occupied.push(...blockedOnCalendarDay(prefs));
   const work: WorkSpan[] = input.busy
     .filter((b) => b.kind === "task")
     .map((b) => ({ start: b.start, end: b.end }));
@@ -367,7 +364,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
         end: start,
         part: 1,
         partCount: 1,
-        reason: `Short break — you would otherwise work more than ${formatDuration(prefs.breakAfterMin)} without a pause.`,
+        reason: encodeParts({ k: "breakReason", after: prefs.breakAfterMin }),
       });
       occupied.push({ start: bStart, end: start });
     }
@@ -385,10 +382,10 @@ export function schedule(input: ScheduleInput): ScheduleResult {
 
     // 1) Single slot honoring the energy preference.
     let placed: ReturnType<typeof fit> = null;
-    let placement = "";
+    let placement: Part | null = null;
     if (task.energy === "high" && focus) {
       placed = fit(dur, { start: focus.start, end: Math.min(focus.end, item.cutoff) }, gaps);
-      if (placed) placement = `Placed in your focus hours because it needs deep focus.`;
+      if (placed) placement = { k: "placeFocus" };
     } else if (task.energy === "low" && focus) {
       const outside = [
         { start: window.start, end: Math.min(focus.start, item.cutoff) },
@@ -398,7 +395,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
         if (r.end <= r.start) continue;
         placed = fit(dur, r, gaps);
         if (placed) {
-          placement = "Kept outside your focus hours since it needs little energy.";
+          placement = { k: "placeOutsideFocus" };
           break;
         }
       }
@@ -408,9 +405,9 @@ export function schedule(input: ScheduleInput): ScheduleResult {
     if (!placed) {
       placed = fit(dur, anywhere, gaps);
       if (placed) {
-        if (task.energy === "high" && focus) placement = "Focus hours were full, so it takes the earliest open slot.";
-        else if (task.energy === "low" && focus) placement = "Only open slot was inside your focus hours.";
-        else placement = "Earliest open slot that fits.";
+        if (task.energy === "high" && focus) placement = { k: "placeFocusFull" };
+        else if (task.energy === "low" && focus) placement = { k: "placeOnlyFocus" };
+        else placement = { k: "placeEarliest" };
       }
     }
 
@@ -421,7 +418,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
         placed.start,
         dur,
         placed.breakBefore,
-        compose(base, placement, movedNote(task.id, placed.start, input), late ? lateNote(task) : null),
+        encodeParts(base, placement, movedNote(task.id, placed.start, input), late ? lateNote(task) : null),
       );
       return;
     }
@@ -440,11 +437,9 @@ export function schedule(input: ScheduleInput): ScheduleResult {
           sess.start,
           sess.dur,
           sess.breakBefore,
-          compose(
+          encodeParts(
             base,
-            count > 1
-              ? `Session ${i + 1} of ${count} — no single gap fits ${formatDuration(dur)}.`
-              : `Only a ${formatDuration(sess.dur)} session fits on this day.`,
+            count > 1 ? { k: "session", i: i + 1, n: count, dur } : { k: "shortSession", dur: sess.dur },
             i === 0 ? movedNote(task.id, sess.start, input) : null,
             late ? lateNote(task) : null,
           ),
@@ -457,7 +452,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
         unscheduled.push({
           taskId: task.id,
           reason: "no_time",
-          message: `Partly scheduled: ${formatDuration(placedMin)} on this day, ${formatDuration(rest)} still needs a slot.`,
+          message: encodeParts({ k: "partly", placed: placedMin, rest }),
           remainingMin: rest,
         });
       }
@@ -536,27 +531,25 @@ function remainingOf(t: SchedulableTask, covered: Map<string, number>): Minutes 
   return Math.max(0, t.estimateMin - (t.progressMin ?? 0) - (covered.get(t.id) ?? 0));
 }
 
-function baseReason(item: Ranked, date: DateKey, today: DateKey, index: number): string {
-  const parts: string[] = [];
-  const dl = deadlinePhrase(item.task, date, today, item.urgency);
-  if (item.task.priority >= 3 || !dl) parts.push(PRIORITY_WORD[item.task.priority]);
-  if (dl) parts.push(dl);
-  if (item.task.status === "in_progress") parts.push("already in progress");
-  const head = parts.join(", ");
-  const rank = index === 0 ? "first in the day's order" : `#${index + 1} in the day's order`;
-  return `${capitalize(head)} — ${rank}.`;
+function baseReason(item: Ranked, date: DateKey, today: DateKey, index: number): Part {
+  const deadline = deadlineNote(item.task, date, today, item.urgency);
+  return {
+    k: "base",
+    priority: item.task.priority >= 3 || !deadline ? item.task.priority : null,
+    deadline,
+    inProgress: item.task.status === "in_progress",
+    rank: index,
+  };
 }
 
-function movedNote(taskId: string, start: Minutes, input: ScheduleInput): string | null {
+function movedNote(taskId: string, start: Minutes, input: ScheduleInput): Part | null {
   const prev = input.previousStarts?.[taskId];
   if (prev == null || prev === start) return null;
-  const why = input.trigger ? ` because ${input.trigger}` : "";
-  return `Moved from ${formatClock(prev)} to ${formatClock(start)}${why}.`;
+  return { k: "moved", from: prev, to: start, trigger: input.trigger };
 }
 
-function lateNote(task: SchedulableTask): string {
-  const at = task.deadlineTime != null ? `${formatClock(task.deadlineTime)} ` : "";
-  return `Warning: ends after its ${at}deadline — consider trimming the scope.`;
+function lateNote(task: SchedulableTask): Part {
+  return { k: "late", at: task.deadlineTime };
 }
 
 function explainUnscheduled(item: Ranked, gaps: Interval[], input: ScheduleInput): UnscheduledNote {
@@ -565,35 +558,20 @@ function explainUnscheduled(item: Ranked, gaps: Interval[], input: ScheduleInput
   const longest = gaps.reduce((m, g) => Math.max(m, length(g)), 0);
   const urgent = item.urgency === "overdue" || item.urgency === "today";
   let reason: UnscheduledReason;
-  let message: string;
+  let why: Part;
   if (freeTotal < remaining) {
     reason = urgent ? "deadline_unreachable" : "no_time";
-    message =
-      freeTotal === 0
-        ? `No free time is left on this day; it needs ${formatDuration(remaining)}.`
-        : `Needs ${formatDuration(remaining)}, but only ${formatDuration(freeTotal)} of free time remains.`;
+    why = freeTotal === 0 ? { k: "noFree", need: remaining } : { k: "notEnough", need: remaining, free: freeTotal };
   } else {
     reason = urgent ? "deadline_unreachable" : "too_long";
-    message =
+    why =
       longest >= remaining
-        ? `Needs ${formatDuration(remaining)}. The longest free gap is ${formatDuration(longest)}, but a required break leaves too little of it.`
-        : `Needs ${formatDuration(remaining)}, but the longest free gap is ${formatDuration(longest)} and it can't be split into sessions of ${formatDuration(input.prefs.minSessionMin)} or more.`;
+        ? { k: "breakEats", need: remaining, longest }
+        : { k: "gapShort", need: remaining, longest, min: input.prefs.minSessionMin };
   }
-  if (urgent) {
-    message += item.urgency === "overdue" ? " Its deadline has already passed." : " It is due that day — free up time or extend your hours.";
-  }
-  if (input.previousStarts?.[task.id] != null && input.trigger) {
-    message = `Moved to the backlog because ${input.trigger}. ${message}`;
-  }
-  return { taskId: task.id, reason, message, remainingMin: remaining };
-}
-
-function compose(...parts: (string | null)[]): string {
-  return parts.filter(Boolean).join(" ");
-}
-
-function capitalize(s: string): string {
-  return s ? s[0].toUpperCase() + s.slice(1) : s;
+  const suffix: Part | null = urgent ? { k: item.urgency === "overdue" ? "overdueSuffix" : "dueDaySuffix" } : null;
+  const moved: Part | null = input.previousStarts?.[task.id] != null && input.trigger ? { k: "toBacklog", trigger: input.trigger } : null;
+  return { taskId: task.id, reason, message: encodeParts(moved, why, suffix), remainingMin: remaining };
 }
 
 // ---- manual adjustment helpers ------------------------------------------------

@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Capabilities for the main Life OS window",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-request-user-attention", "core:window:allow-set-fullscreen", "core:window:allow-set-theme"]
 }

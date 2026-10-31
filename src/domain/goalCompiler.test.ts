@@ -141,3 +141,46 @@ describe("plan revision", () => {
     expect(rev.summary.skippedDuplicates).toBe(1);
   });
 });
+
+describe("Persian goals", () => {
+  const req = (text: string, lang?: "en" | "fa") => ({ text, targetDate: null, hoursPerWeek: 5, today: TODAY, lang });
+
+  it("recognises goals written in Persian", () => {
+    expect(detectArchetype("برای امتحانای دانشگاهم آماده شم").id).toBe("exam");
+    expect(detectArchetype("نیمه‌ماراتن بدوم").id).toBe("fitness");
+    expect(detectArchetype("یه کار جدید پیدا کنم").id).toBe("career");
+    expect(detectArchetype("یه رمان بنویسم").id).toBe("writing");
+    expect(detectArchetype("پروژه‌ی شخصی‌ام رو لانچ کنم").id).toBe("build");
+    expect(detectArchetype("برنامه‌نویس بک‌اند بهتری بشم").id).toBe("skill");
+    expect(detectArchetype("آروم‌تر زندگی کنم").id).toBe("general");
+  });
+
+  it("writes the plan in the language of the goal", () => {
+    const plan = compileGoal(req("برنامه‌نویس بک‌اند بهتری بشم"));
+    const titles = plan.milestones.flatMap((m) => m.projects.flatMap((p) => p.tasks.map((t) => t.title)));
+    expect(titles.every((t) => /[؀-ۿ]/.test(t))).toBe(true);
+    expect(titles.some((t) => t.includes("ریویو"))).toBe(true);
+    expect(plan.source).toBe("template");
+    expect(plan.notes[0]).toMatch(/[۰-۹]/);
+  });
+
+  it("follows the app language for goals typed in Latin letters", () => {
+    expect(compileGoal(req("Learn IELTS", "fa")).milestones[0].title).toMatch(/[؀-ۿ]/);
+    expect(compileGoal(req("Learn IELTS", "en")).milestones[0].title).not.toMatch(/[؀-ۿ]/);
+  });
+
+  it("has the same structure in both languages for every goal type", () => {
+    for (const [fa, en] of [
+      ["برای کنکور آماده شم", "Pass my exam"],
+      ["وزن کم کنم", "Lose weight"],
+      ["استخدام بشم", "Get a job"],
+      ["کتاب بنویسم", "Write a book"],
+      ["سایت بسازم", "Build a website"],
+      ["زبان یاد بگیرم", "Learn a language"],
+      ["آروم‌تر زندگی کنم", "Feel calmer"],
+    ]) {
+      const count = (text: string) => compileGoal(req(text)).milestones.map((m) => m.projects.map((p) => p.tasks.length));
+      expect(count(fa)).toEqual(count(en));
+    }
+  });
+});

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Preferences } from "../../domain/types";
+import { t } from "../../i18n";
 import { savePrefs, useApp, validatePrefs } from "../../state/store";
 import { NumberInput, TimeInput } from "../../ui/fields";
 import { Button, Dialog, Field } from "../../ui/primitives";
@@ -9,50 +10,50 @@ export function PrefsFields({ value, onChange }: { value: Preferences; onChange:
   return (
     <div className="prefs-grid">
       <fieldset className="prefs-group">
-        <legend>Working hours</legend>
+        <legend>{t.workingHours}</legend>
         <div className="field-row">
-          <Field label="Start">
+          <Field label={t.commitStart}>
             <TimeInput value={value.workStart} onChange={(v) => v != null && set({ workStart: v })} />
           </Field>
-          <Field label="End">
+          <Field label={t.commitEnd}>
             <TimeInput value={value.workEnd} onChange={(v) => v != null && set({ workEnd: v })} />
           </Field>
         </div>
       </fieldset>
       <fieldset className="prefs-group">
-        <legend>Focus hours</legend>
+        <legend>{t.focusHours}</legend>
         <div className="field-row">
-          <Field label="From">
+          <Field label={t.from}>
             <TimeInput value={value.focusStart} onChange={(v) => v != null && set({ focusStart: v })} />
           </Field>
-          <Field label="Until">
+          <Field label={t.until}>
             <TimeInput value={value.focusEnd} onChange={(v) => v != null && set({ focusEnd: v })} />
           </Field>
         </div>
-        <p className="field__hint">Deep-focus tasks are placed here first; low-energy tasks stay out of it.</p>
+        <p className="field__hint">{t.focusHint}</p>
       </fieldset>
       <fieldset className="prefs-group">
-        <legend>Pacing</legend>
+        <legend>{t.pacing}</legend>
         <div className="field-row">
-          <Field label="Break after" hint="0 disables automatic breaks">
-            <NumberInput value={value.breakAfterMin} min={0} max={300} suffix="min" onChange={(v) => set({ breakAfterMin: v })} />
+          <Field label={t.breakAfter} hint={t.breakAfterHint}>
+            <NumberInput value={value.breakAfterMin} min={0} max={300} suffix={t.min} onChange={(v) => set({ breakAfterMin: v })} />
           </Field>
-          <Field label="Break length">
-            <NumberInput value={value.breakLengthMin} min={5} max={60} suffix="min" onChange={(v) => set({ breakLengthMin: v })} />
+          <Field label={t.breakLength}>
+            <NumberInput value={value.breakLengthMin} min={5} max={60} suffix={t.min} onChange={(v) => set({ breakLengthMin: v })} />
           </Field>
-          <Field label="Buffer between tasks">
-            <NumberInput value={value.bufferMin} min={0} max={60} suffix="min" onChange={(v) => set({ bufferMin: v })} />
+          <Field label={t.bufferBetween}>
+            <NumberInput value={value.bufferMin} min={0} max={60} suffix={t.min} onChange={(v) => set({ bufferMin: v })} />
           </Field>
         </div>
       </fieldset>
       <fieldset className="prefs-group">
-        <legend>Tasks</legend>
+        <legend>{t.tasksGroup}</legend>
         <div className="field-row">
-          <Field label="Shortest session" hint="Long tasks split into sessions no shorter than this">
-            <NumberInput value={value.minSessionMin} min={10} max={180} suffix="min" onChange={(v) => set({ minSessionMin: v })} />
+          <Field label={t.shortestSession} hint={t.shortestSessionHint}>
+            <NumberInput value={value.minSessionMin} min={10} max={180} suffix={t.min} onChange={(v) => set({ minSessionMin: v })} />
           </Field>
-          <Field label="Default duration">
-            <NumberInput value={value.defaultEstimateMin} min={5} max={480} suffix="min" onChange={(v) => set({ defaultEstimateMin: v })} />
+          <Field label={t.defaultDuration}>
+            <NumberInput value={value.defaultEstimateMin} min={5} max={480} suffix={t.min} onChange={(v) => set({ defaultEstimateMin: v })} />
           </Field>
         </div>
       </fieldset>
@@ -72,13 +73,13 @@ export function PrefsDialog({ open, onClose }: { open: boolean; onClose: () => v
       open={open}
       onClose={onClose}
       wide
-      title="Planning preferences"
-      subtitle="The scheduler uses these to build realistic days. Changes apply the next time you plan."
+      title={t.planningPrefs}
+      subtitle={t.prefsSub}
       footer={
         <>
-          {error && <span className="field__error" style={{ marginRight: "auto" }}>{error}</span>}
+          {error && <span className="field__error" style={{ marginInlineEnd: "auto" }}>{error}</span>}
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t.cancel}
           </Button>
           <Button
             variant="primary"
@@ -87,7 +88,7 @@ export function PrefsDialog({ open, onClose }: { open: boolean; onClose: () => v
               if (await savePrefs(draft)) onClose();
             }}
           >
-            Save
+            {t.save}
           </Button>
         </>
       }

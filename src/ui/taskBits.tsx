@@ -1,6 +1,7 @@
 import { BatteryLow, BatteryMedium, CalendarClock, Clock3, Zap } from "lucide-react";
 import { formatClock, formatDuration, relativeDay } from "../domain/time";
-import { PRIORITY_LABEL, type DateKey, type Energy, type Priority, type Task } from "../domain/types";
+import type { DateKey, Energy, Priority, Task } from "../domain/types";
+import { t } from "../i18n";
 
 export const PRIORITY_COLOR: Record<Priority, string> = {
   1: "var(--priority-1)",
@@ -10,7 +11,7 @@ export const PRIORITY_COLOR: Record<Priority, string> = {
 };
 
 export function PriorityDot({ priority }: { priority: Priority }) {
-  return <span className="prio-dot" style={{ background: PRIORITY_COLOR[priority] }} title={`${PRIORITY_LABEL[priority]} priority`} aria-label={`${PRIORITY_LABEL[priority]} priority`} />;
+  return <span className="prio-dot" style={{ background: PRIORITY_COLOR[priority] }} title={t.priorityOf(t.priority[priority])} aria-label={t.priorityOf(t.priority[priority])} />;
 }
 
 export function EnergyIcon({ energy, size = 12 }: { energy: Energy; size?: number }) {
@@ -19,16 +20,14 @@ export function EnergyIcon({ energy, size = 12 }: { energy: Energy; size?: numbe
   return <BatteryLow size={size} />;
 }
 
-const ENERGY_SHORT: Record<Energy, string> = { low: "Low energy", medium: "Medium", high: "Deep focus" };
-
 export function DeadlineChip({ task, today }: { task: Pick<Task, "deadline" | "deadlineTime" | "status">; today: DateKey }) {
   if (!task.deadline) return null;
   const overdue = task.deadline < today && task.status !== "done";
   const dueToday = task.deadline === today;
   return (
-    <span className={`chip ${overdue ? "chip--danger" : dueToday ? "chip--warn" : ""}`} title={`Deadline ${task.deadline}`}>
+    <span className={`chip ${overdue ? "chip--danger" : dueToday ? "chip--warn" : ""}`} title={t.deadlineOn(relativeDay(task.deadline, today))}>
       <CalendarClock size={12} />
-      {overdue ? "Overdue · " : ""}
+      {overdue ? t.overduePrefix : ""}
       {relativeDay(task.deadline, today)}
       {task.deadlineTime != null ? ` ${formatClock(task.deadlineTime)}` : ""}
     </span>
@@ -41,17 +40,17 @@ export function TaskMeta({ task, today, showPriority = true }: { task: Task; tod
     <>
       {showPriority && task.priority >= 3 && (
         <span className="chip" style={{ color: PRIORITY_COLOR[task.priority] }}>
-          {PRIORITY_LABEL[task.priority]}
+          {t.priority[task.priority]}
         </span>
       )}
-      <span className="chip" title="Estimated duration">
+      <span className="chip" title={t.estimatedDuration}>
         <Clock3 size={12} />
-        {task.progressMin > 0 && task.status !== "done" ? `${formatDuration(remaining)} left` : formatDuration(task.estimateMin)}
+        {task.progressMin > 0 && task.status !== "done" ? t.durationLeft(formatDuration(remaining)) : formatDuration(task.estimateMin)}
       </span>
       {task.energy && (
         <span className={`chip ${task.energy === "high" ? "chip--accent" : ""}`}>
           <EnergyIcon energy={task.energy} />
-          {ENERGY_SHORT[task.energy]}
+          {t.energy[task.energy]}
         </span>
       )}
       <DeadlineChip task={task} today={today} />

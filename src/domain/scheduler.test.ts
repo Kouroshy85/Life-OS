@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { explain } from "../i18n";
 import {
   findOverlaps,
   nearestFreeStart,
@@ -154,20 +155,20 @@ describe("schedule — prioritisation", () => {
     expect(byId.deep.start).toBeGreaterThanOrEqual(h(9));
     expect(byId.deep.end).toBeLessThanOrEqual(h(12));
     expect(byId.light.start).toBeGreaterThanOrEqual(h(12));
-    expect(byId.deep.reason).toMatch(/focus hours/);
-    expect(byId.light.reason).toMatch(/outside your focus hours/);
+    expect(explain(byId.deep.reason)).toMatch(/focus hours/);
+    expect(explain(byId.light.reason)).toMatch(/outside your focus hours/);
   });
 
   it("does not say 'today' when planning another day", () => {
     const result = schedule(input({ date: "2026-11-03", tasks: [task({ deadline: "2026-11-03" })] }));
-    expect(result.blocks[0].reason).toMatch(/due that day/i);
-    expect(result.blocks[0].reason).not.toMatch(/today/);
+    expect(explain(result.blocks[0].reason)).toMatch(/due that day/i);
+    expect(explain(result.blocks[0].reason)).not.toMatch(/today/);
   });
 
   it("explains every scheduled block", () => {
     const result = schedule(input({ tasks: [task(), task({ priority: 4, deadline: "2026-11-03" })] }));
     for (const b of result.blocks) expect(b.reason.length).toBeGreaterThan(10);
-    expect(result.blocks[0].reason).toMatch(/Critical priority, due tomorrow/);
+    expect(explain(result.blocks[0].reason)).toMatch(/Critical priority, due tomorrow/);
   });
 });
 
@@ -177,7 +178,7 @@ describe("schedule — deadlines", () => {
     const normal = task({ id: "normal", priority: 3 });
     const result = schedule(input({ tasks: [normal, overdue] }));
     expect(result.blocks[0].taskId).toBe("overdue");
-    expect(result.blocks[0].reason).toMatch(/deadline passed on/i);
+    expect(explain(result.blocks[0].reason)).toMatch(/deadline passed on/i);
   });
 
   it("finishes a same-day task before its deadline time when possible", () => {
@@ -190,7 +191,7 @@ describe("schedule — deadlines", () => {
     const due = task({ id: "due", estimateMin: 60, deadline: DATE, deadlineTime: h(10) });
     const result = schedule(input({ nowMin: h(9, 30), tasks: [due] }));
     expect(result.blocks[0].start).toBe(h(9, 30));
-    expect(result.blocks[0].reason).toMatch(/after its 10:00 deadline/);
+    expect(explain(result.blocks[0].reason)).toMatch(/after its 10:00 deadline/);
   });
 
   it("marks urgent tasks that cannot fit at all as deadline_unreachable", () => {
@@ -209,7 +210,7 @@ describe("schedule — insufficient time", () => {
     const unscheduledIds = result.unscheduled.map((u) => u.taskId);
     for (const t of tasks) expect(scheduledIds.has(t.id) || unscheduledIds.includes(t.id)).toBe(true);
     expect(result.unscheduled.find((u) => u.taskId === "c")?.reason).toBe("no_time");
-    expect(result.unscheduled[0].message).toMatch(/only 1h of free time remains/);
+    expect(explain(result.unscheduled[0].message)).toMatch(/only 1h of free time remains/);
   });
 
   it("returns everything as unscheduled once the working day is over", () => {
@@ -238,7 +239,7 @@ describe("schedule — insufficient time", () => {
     expect(parts.length).toBeGreaterThan(1);
     expect(parts.reduce((s, b) => s + (b.end - b.start), 0)).toBe(240);
     expect(parts.every((p) => p.partCount === parts.length)).toBe(true);
-    expect(parts[0].reason).toMatch(/Session 1 of/);
+    expect(explain(parts[0].reason)).toMatch(/Session 1 of/);
     expect(findOverlaps(parts, busy)).toEqual([]);
   });
 
@@ -292,7 +293,7 @@ describe("schedule — rescheduling", () => {
     );
     const newB = second.blocks.find((x) => x.taskId === "B")!;
     expect(newB.start).toBe(h(10, 30));
-    expect(newB.reason).toMatch(/Moved from 10:00 to 10:30 because “A” ran 30 min over/);
+    expect(explain(newB.reason)).toMatch(/Moved from 10:00 to 10:30 because “A” ran 30 min over/);
     expect(second.blocks.some((x) => x.taskId === "A")).toBe(false);
   });
 
@@ -311,7 +312,7 @@ describe("schedule — rescheduling", () => {
       }),
     );
     expect(second.blocks).toHaveLength(0);
-    expect(second.unscheduled[0].message).toMatch(/^Moved to the backlog because “Call” was added/);
+    expect(explain(second.unscheduled[0].message)).toMatch(/^Moved to the backlog because “Call” was added/);
   });
 });
 

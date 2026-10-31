@@ -1,0 +1,270 @@
+/* =========================================================================
+   Theme scenes
+   ========================================================================= */
+
+.scene-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  animation: scene-in 900ms var(--ease) both;
+}
+
+@keyframes scene-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* The art is drawn for the side away from the sidebar, so it follows the layout. */
+[dir="rtl"] .scene {
+  transform: scaleX(-1);
+}
+
+/* Relax keeps its timer on the right in every language, so its scene never mirrors. */
+[dir="rtl"] .relax .scene {
+  transform: none;
+}
+
+.relax .scene__shift {
+  transform: translateX(170px);
+}
+
+/* A quiet backing so the digits never compete with the art. */
+.scened .relax-ring__center {
+  inset: 3%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(var(--bg-rgb) / 0.94) 60%, rgb(var(--bg-rgb) / 0.8));
+}
+
+/* Colours glide during a theme switch, and only then. */
+.theme-changing,
+.theme-changing *,
+.theme-changing *::before,
+.theme-changing *::after {
+  transition: background-color 500ms var(--ease), color 500ms var(--ease), border-color 500ms var(--ease), box-shadow 500ms var(--ease), fill 500ms var(--ease) !important;
+}
+
+/* .scened is every theme with a scene; .lit is the light ones. Default has neither.
+   Panels turn solid enough that a scene never sits behind text. */
+.scened .card,
+.scened .stat,
+.scened .goal-tile,
+.scened .goal-card,
+.scened .milestone,
+.scened .plan-row,
+.scened .plan-adder,
+.scened .free-day,
+.scened .dream-card,
+.scened .free-card,
+.scened .week-card {
+  background-color: rgb(var(--bg-rgb) / var(--panel-alpha));
+}
+
+.scened .sidebar__new {
+  color: var(--text-on-accent);
+}
+
+/* On a light theme the glass needs a visible edge, and its hover tints need depth. */
+.lit .glass {
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.32),
+    inset 0 0 0 0.5px rgb(var(--ink) / 0.1),
+    inset 0 -1px 1px rgb(var(--ink) / 0.04),
+    var(--shadow-float);
+}
+
+:root[data-theme="strawberry"],
+:root[data-theme="neutral"],
+:root[data-theme="sky"] {
+  --shadow-float: 0 22px 50px -26px rgb(var(--shadow-rgb) / 0.5), 0 2px 8px -2px rgb(var(--shadow-rgb) / 0.2);
+}
+
+/* Motion */
+
+.scene__sway {
+  transform-origin: 50% 100%;
+  animation: scene-sway 9s ease-in-out infinite alternate;
+}
+
+@keyframes scene-sway {
+  from { transform: skewX(-0.5deg); }
+  to { transform: skewX(0.6deg); }
+}
+
+.scene__fly {
+  filter: blur(1px);
+  animation: scene-fly 5.4s ease-in-out infinite;
+}
+
+@keyframes scene-fly {
+  0%, 100% { opacity: 0.1; transform: translate(0, 0); }
+  50% { opacity: 0.95; transform: translate(16px, -22px); }
+}
+
+.scene__blinds {
+  animation: scene-blinds 24s ease-in-out infinite alternate;
+}
+
+@keyframes scene-blinds {
+  to { transform: rotate(-14deg) translateY(36px); opacity: 0.7; }
+}
+
+.scene__drift {
+  animation: scene-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes scene-drift {
+  to { transform: translateX(44px); }
+}
+
+.scene__twinkle {
+  animation: scene-twinkle 4.2s ease-in-out infinite;
+}
+
+@keyframes scene-twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.65); }
+  50% { opacity: 0.95; transform: scale(1.1); }
+}
+
+.scene__rain line {
+  animation: scene-rain 1.3s linear infinite;
+  opacity: 0.4;
+}
+
+@keyframes scene-rain {
+  from { transform: translate(0, -40px); opacity: 0; }
+  12% { opacity: 0.4; }
+  to { transform: translate(-90px, 420px); opacity: 0.12; }
+}
+
+.scene__cloud-a { animation: scene-cloud 60s ease-in-out infinite alternate; }
+.scene__cloud-b { animation: scene-cloud 84s ease-in-out infinite alternate-reverse; }
+.scene__cloud-c { animation: scene-cloud 46s ease-in-out infinite alternate; }
+
+@keyframes scene-cloud {
+  from { transform: translateX(-46px); }
+  to { transform: translateX(56px); }
+}
+
+.scene__drop {
+  animation: scene-drop 6.6s cubic-bezier(0.6, 0, 1, 1) infinite;
+  opacity: 0;
+}
+
+@keyframes scene-drop {
+  0%, 62% { opacity: 0; transform: translateY(0) scaleY(0.6); }
+  66% { opacity: 1; transform: translateY(0) scaleY(1); }
+  100% { opacity: 0.9; transform: translateY(680px) scaleY(1.2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene *,
+  .scene-layer {
+    animation: none !important;
+  }
+  .scene__rain line,
+  .scene__fly,
+  .scene__twinkle {
+    opacity: 0.45;
+  }
+  .scene__drop {
+    opacity: 0;
+  }
+}
+
+/* =========================================================================
+   Switcher and indicator
+   ========================================================================= */
+
+.theme-swatch {
+  display: inline-block;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px rgb(var(--ink) / 0.28), 0 2px 6px rgb(var(--shadow-rgb) / 0.35);
+}
+
+.theme-trigger .theme-swatch {
+  margin-inline: -1px;
+}
+
+.menu__check {
+  margin-inline-start: auto;
+  color: var(--violet-300) !important;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 12px;
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 12px 12px;
+  border-radius: var(--r-md);
+  border: 1.5px solid rgb(var(--ink) / 0.14);
+  text-align: start;
+  font-size: 13.5px;
+  box-shadow: var(--shadow-soft);
+  transition: transform var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+
+.theme-card:hover {
+  transform: translateY(-2px);
+}
+
+.theme-card:focus-visible {
+  border-radius: var(--r-md);
+}
+
+.theme-card small {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.theme-card__mock {
+  display: grid;
+  grid-template-columns: 18px 1fr 1fr;
+  grid-template-rows: 15px 15px;
+  gap: 4px;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.theme-card__mock i {
+  grid-row: 1 / 3;
+  border-radius: 5px;
+}
+
+.theme-card__mock b {
+  grid-column: 2 / 4;
+  border-radius: 5px;
+}
+
+.theme-card__mock em,
+.theme-card__mock u {
+  border-radius: 5px;
+}
+
+.theme-card__check {
+  position: absolute;
+  top: -7px;
+  inset-inline-end: -7px;
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  animation: done-pop 360ms var(--ease-spring) both;
+}

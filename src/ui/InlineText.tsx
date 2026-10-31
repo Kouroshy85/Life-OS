@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { hasLetters } from "../domain/text";
 
 /** Text that edits in place: Enter or blur saves, Escape reverts. Empty values are refused. */
 export function InlineText({
@@ -26,7 +27,7 @@ export function InlineText({
 
   const commit = () => {
     const v = draft.trim();
-    if (!v && !allowEmpty) {
+    if (v ? !allowEmpty && !hasLetters(v) : !allowEmpty) {
       setDraft(value);
       return;
     }
@@ -34,6 +35,7 @@ export function InlineText({
   };
   const props = {
     ref,
+    dir: "auto",
     "aria-label": label,
     className: `input input--bare inline-text ${className}`,
     value: draft,

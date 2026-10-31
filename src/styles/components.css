@@ -3,13 +3,11 @@
 .glass {
   position: relative;
   isolation: isolate;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.015) 42%, rgba(255, 255, 255, 0.03)),
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.015) 42%, rgba(255, 255, 255, 0.03)),
     var(--glass-tint);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
   backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-  box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.32),
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.32),
     inset 0 0 0 0.5px rgba(255, 255, 255, 0.09),
     inset 0 -1px 1px rgba(255, 255, 255, 0.04),
     var(--shadow-float);
@@ -27,11 +25,10 @@
     rgba(255, 255, 255, 0.34),
     rgba(255, 255, 255, 0.06) 28%,
     rgba(255, 255, 255, 0.02) 62%,
-    rgba(196, 181, 253, 0.16)
+    rgb(var(--a300) / 0.16)
   );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
+  -webkit-mask: linear-gradient(var(--bg) 0 0) content-box,
+    linear-gradient(var(--bg) 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
@@ -55,8 +52,7 @@
 }
 
 .glass--dense {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015) 40%),
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015) 40%),
     var(--glass-tint-strong);
 }
 
@@ -77,7 +73,7 @@
 }
 
 .card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.018));
+  background: linear-gradient(180deg, rgb(var(--ink) / 0.035), rgb(var(--ink) / 0.018));
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   padding: 22px 24px;
@@ -132,8 +128,7 @@
   font-weight: 560;
   letter-spacing: 0.005em;
   white-space: nowrap;
-  transition:
-    background var(--dur-1) var(--ease),
+  transition: background var(--dur-1) var(--ease),
     color var(--dur-1) var(--ease),
     transform var(--dur-1) var(--ease),
     box-shadow var(--dur-2) var(--ease),
@@ -176,35 +171,30 @@
 
 .btn--primary {
   color: var(--text-on-accent);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 55%),
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 55%),
     linear-gradient(180deg, var(--violet-500), var(--violet-600));
-  box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.45),
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.45),
     inset 0 0 0 0.5px rgba(255, 255, 255, 0.12),
-    0 8px 22px -10px rgba(124, 58, 237, 0.75);
+    0 8px 22px -10px rgb(var(--a600) / 0.75);
 }
 
 .btn--primary:hover:not(:disabled) {
-  box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.55),
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.55),
     inset 0 0 0 0.5px rgba(255, 255, 255, 0.16),
-    0 10px 28px -10px rgba(139, 92, 246, 0.95);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 55%),
-    linear-gradient(180deg, #9466f7, var(--violet-600));
+    0 10px 28px -10px rgb(var(--a500) / 0.95);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(180deg, rgb(var(--a-bright)), var(--violet-600));
 }
 
 .btn--glass {
   color: var(--text);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.035));
-  box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgb(var(--ink) / 0.09), rgb(var(--ink) / 0.035));
+  box-shadow: inset 0 0.5px 0 rgb(var(--ink) / 0.22),
+    inset 0 0 0 0.5px rgb(var(--ink) / 0.08);
 }
 
 .btn--glass:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05));
+  background: linear-gradient(180deg, rgb(var(--ink) / 0.13), rgb(var(--ink) / 0.05));
 }
 
 .btn--ghost {
@@ -213,17 +203,17 @@
 
 .btn--ghost:hover:not(:disabled) {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgb(var(--ink) / 0.06);
 }
 
 .btn--danger {
-  color: #ffe4e8;
-  background: linear-gradient(180deg, rgba(251, 113, 133, 0.32), rgba(225, 29, 72, 0.32));
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.2), inset 0 0 0 0.5px rgba(251, 113, 133, 0.35);
+  color: var(--on-danger);
+  background: linear-gradient(180deg, rgb(var(--danger-rgb) / 0.32), rgb(var(--danger-2) / 0.32));
+  box-shadow: inset 0 0.5px 0 rgb(var(--ink) / 0.2), inset 0 0 0 0.5px rgb(var(--danger-rgb) / 0.35);
 }
 
 .btn--danger:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(251, 113, 133, 0.45), rgba(225, 29, 72, 0.42));
+  background: linear-gradient(180deg, rgb(var(--danger-rgb) / 0.45), rgb(var(--danger-2) / 0.42));
 }
 
 .btn--danger-ghost {
@@ -246,7 +236,7 @@
 
 .icon-btn:hover:not(:disabled) {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.07);
+  background: rgb(var(--ink) / 0.07);
 }
 
 .icon-btn--active {
@@ -286,7 +276,7 @@
   min-height: 40px;
   padding: 9px 13px;
   border-radius: var(--r-sm);
-  background: rgba(0, 0, 0, 0.22);
+  background: rgb(var(--well) / 0.22);
   border: 1px solid var(--line-strong);
   color: var(--text);
   font-size: var(--fs-md);
@@ -301,19 +291,19 @@
 .input:hover,
 .textarea:hover,
 .select:hover {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: rgb(var(--ink) / 0.18);
 }
 
 .input:focus,
 .textarea:focus,
 .select:focus {
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.16);
-  background: rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 4px rgb(var(--a500) / 0.16);
+  background: rgb(var(--well) / 0.3);
 }
 
 .input[aria-invalid="true"] {
-  border-color: rgba(251, 113, 133, 0.55);
+  border-color: rgb(var(--danger-rgb) / 0.55);
 }
 
 .textarea {
@@ -323,8 +313,8 @@
 
 .select {
   appearance: none;
-  padding-right: 34px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a5a1b5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  padding-inline-end: 34px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http: //www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a5a1b5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
   background-repeat: no-repeat;
   background-position: right 12px center;
 }
@@ -336,8 +326,8 @@
 .input--bare {
   background: transparent;
   border-color: transparent;
-  padding-left: 0;
-  padding-right: 0;
+  padding-inline-start: 0;
+  padding-inline-end: 0;
   min-height: 0;
 }
 
@@ -398,16 +388,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .switch__thumb {
   position: absolute;
   top: 3px;
-  left: 3px;
+  inset-inline-start: 3px;
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  background: var(--text-on-accent);
+  box-shadow: 0 2px 6px rgb(var(--shadow-rgb) / 0.35);
   transition: transform var(--dur-2) var(--ease-spring);
 }
 
+.switch__thumb {
+  background: rgb(var(--ink));
+}
+
 .switch[aria-checked="true"] .switch__thumb {
+  background: var(--text-on-accent);
   transform: translateX(18px);
 }
 
@@ -418,8 +413,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display: inline-flex;
   padding: 3px;
   border-radius: var(--r-pill);
-  background: rgba(0, 0, 0, 0.25);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.08), inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  background: rgb(var(--well) / 0.25);
+  box-shadow: inset 0 0 0 0.5px rgb(var(--ink) / 0.08), inset 0 1px 2px rgb(var(--shadow-rgb) / 0.3);
 }
 
 .segmented__thumb {
@@ -428,7 +423,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   bottom: 3px;
   border-radius: var(--r-pill);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07));
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.35), 0 4px 12px -4px rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.35), 0 4px 12px -4px rgb(var(--shadow-rgb) / 0.6);
   transition: left var(--dur-3) var(--ease-spring), width var(--dur-3) var(--ease-spring);
 }
 
@@ -467,7 +462,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-size: 11.5px;
   font-weight: 560;
   color: var(--text-2);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgb(var(--ink) / 0.05);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -506,8 +501,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-size: 11.5px;
   font-weight: 600;
   color: var(--text-2);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+  background: rgb(var(--ink) / 0.05);
+  box-shadow: inset 0 0 0 0.5px rgb(var(--ink) / 0.1);
 }
 
 .badge-source--ai {
@@ -545,7 +540,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   height: 20px;
   flex: none;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.24);
+  border: 1.5px solid rgb(var(--ink) / 0.24);
   display: grid;
   place-items: center;
   color: transparent;
@@ -560,8 +555,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .tick[aria-checked="true"] {
   border-color: transparent;
   background: linear-gradient(180deg, var(--violet-500), var(--violet-600));
-  color: #fff;
-  box-shadow: 0 4px 12px -4px rgba(139, 92, 246, 0.8);
+  color: var(--text-on-accent);
+  box-shadow: 0 4px 12px -4px rgb(var(--a500) / 0.8);
 }
 
 .tick[aria-checked="mixed"] {
@@ -578,7 +573,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .bar {
   height: 6px;
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.07);
+  background: rgb(var(--ink) / 0.07);
   overflow: hidden;
 }
 
@@ -586,12 +581,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--violet-600), var(--violet-400));
-  box-shadow: 0 0 12px rgba(139, 92, 246, 0.45);
+  box-shadow: 0 0 12px rgb(var(--a500) / 0.45);
   transition: width var(--dur-3) var(--ease);
 }
 
 .ring__track {
-  stroke: rgba(255, 255, 255, 0.08);
+  stroke: rgb(var(--ink) / 0.08);
 }
 
 .ring__value {
@@ -607,7 +602,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display: grid;
   place-items: center;
   padding: 28px;
-  background: rgba(5, 5, 10, 0.55);
+  background: rgb(var(--overlay-rgb) / 0.55);
   animation: fade var(--dur-2) var(--ease);
 }
 
@@ -684,7 +679,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: 9px;
   font-size: var(--fs-sm);
   color: var(--text);
-  text-align: left;
+  text-align: start;
 }
 
 .menu__item svg {
@@ -693,7 +688,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .menu__item:hover,
 .menu__item:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--ink) / 0.08);
   box-shadow: none;
 }
 
@@ -712,7 +707,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .toasts {
   position: fixed;
-  right: 22px;
+  inset-inline-end: 22px;
   bottom: 22px;
   z-index: 80;
   display: flex;
@@ -796,7 +791,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-2);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06), inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+  background: rgb(var(--ink) / 0.06);
+  box-shadow: inset 0 -1px 0 rgb(var(--ink) / 0.06), inset 0 0 0 0.5px rgb(var(--ink) / 0.1);
   font-family: var(--font);
 }

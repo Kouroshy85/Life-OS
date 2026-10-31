@@ -1,10 +1,18 @@
 import { CircleAlert } from "lucide-react";
 import { useEffect } from "react";
+import { DreamsView } from "./features/dreams/DreamsView";
 import { GoalsView } from "./features/goals/GoalsView";
+import { GoalWizard } from "./features/goals/GoalWizard";
 import { PlannerView } from "./features/planner/PlannerView";
+import { PlansView } from "./features/planner/PlansView";
+import { RelaxLauncher, RelaxMode } from "./features/relax/RelaxMode";
 import { SettingsView } from "./features/settings/SettingsView";
 import { Sidebar } from "./features/shell/Sidebar";
+import { ThemeScene } from "./features/shell/ThemeScene";
+import { ReminderDialog } from "./features/today/NotesDeck";
 import { TodayView } from "./features/today/TodayView";
+import { WeekView } from "./features/week/WeekView";
+import { t } from "./i18n";
 import { init, navigate, openComposer, tick, useApp } from "./state/store";
 import { LiquidGlass } from "./ui/LiquidGlass";
 import { Toasts } from "./ui/primitives";
@@ -15,6 +23,7 @@ function Ambient() {
       <div className="ambient__orb ambient__orb--a" />
       <div className="ambient__orb ambient__orb--b" />
       <div className="ambient__grain" />
+      <ThemeScene />
     </div>
   );
 }
@@ -26,6 +35,9 @@ export default function App() {
   const status = useApp((s) => s.status);
   const fatal = useApp((s) => s.fatal);
   const view = useApp((s) => s.view);
+  const lang = useApp((s) => s.lang);
+  const plannerMode = useApp((s) => s.plannerMode);
+  const relaxing = useApp((s) => !!s.relaxSession);
 
   useEffect(() => {
     void init();
@@ -42,11 +54,12 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod || e.altKey) return;
-      if (document.querySelector(".overlay")) return;
+      if (document.querySelector(".overlay, .relax")) return;
       const map: Record<string, () => void> = {
         "1": () => navigate("today"),
-        "2": () => navigate("goals"),
+        "2": () => navigate("week"),
         "3": () => navigate("planner"),
+        "4": () => navigate("goals"),
         ",": () => navigate("settings"),
         n: () => openComposer(true),
       };
@@ -74,15 +87,15 @@ export default function App() {
           {status === "error" ? (
             <LiquidGlass dense className="boot__card" radius={24}>
               <CircleAlert size={28} color="var(--danger)" />
-              <h1 className="section-title">Life OS couldn't open its database</h1>
+              <h1 className="section-title">{t.bootErrorTitle}</h1>
               <p className="muted">{fatal}</p>
               <p className="faint" style={{ fontSize: 13 }}>
-                Your data has not been modified. Restart the app; if this keeps happening, check that the app data folder is writable.
+                {t.bootErrorHint}
               </p>
             </LiquidGlass>
           ) : (
             <span className="faint" aria-live="polite">
-              Opening your data…
+              {t.bootOpening}
             </span>
           )}
         </div>
@@ -93,15 +106,22 @@ export default function App() {
   return (
     <>
       <Ambient />
-      <div className="app">
+      {/* Keyed so that switching language re-renders every screen with the new strings. */}
+      <div className="app" key={lang}>
         <Sidebar />
         <main className="main">
           {view === "today" && <TodayView />}
+          {view === "week" && <WeekView />}
           {view === "goals" && <GoalsView />}
-          {view === "planner" && <PlannerView />}
+          {view === "planner" && (plannerMode === "plans" ? <PlansView /> : <PlannerView />)}
+          {view === "dreams" && <DreamsView />}
           {view === "settings" && <SettingsView />}
         </main>
       </div>
+      <GoalWizard />
+      <RelaxLauncher />
+      {relaxing && <RelaxMode />}
+      <ReminderDialog />
       <Toasts />
     </>
   );

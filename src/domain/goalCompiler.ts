@@ -6,6 +6,9 @@
  * produced here are labelled `source: "template"` throughout the app.
  */
 
+import { hasLetters } from "./text";
+import { FA_LABEL, FA_MATCH, FA_TECH, faTemplate, normalizeFa } from "./goalTemplates.fa";
+import { getLang, hasPersian, toFaDigits, type Lang } from "./locale";
 import { addDays, daysBetween, isValidDateKey } from "./time";
 import type { DateKey, Energy, Minutes, PlanSource, Priority } from "./types";
 
@@ -16,6 +19,8 @@ export interface GoalRequest {
   /** Hours per week the user can realistically spend (used for pacing). */
   hoursPerWeek: number;
   today: DateKey;
+  /** Language for generated text when the goal itself is not in Persian. Defaults to the app language. */
+  lang?: Lang;
 }
 
 export interface CompiledTask {
@@ -575,13 +580,21 @@ export function extractSubject(text: string): string {
 }
 
 export function detectArchetype(text: string): Archetype {
-  return ARCHETYPES.find((a) => a.match.test(text)) ?? GENERAL;
+  const norm = normalizeFa(text);
+  return ARCHETYPES.find((a) => a.match.test(text) || FA_MATCH[a.id]?.test(norm)) ?? GENERAL;
+}
+
+/** A plan follows the language the goal was written in, otherwise the app language. */
+export function planLanguage(text: string, appLang: Lang = getLang()): Lang {
+  return hasPersian(text) ? "fa" : appLang;
 }
 
 export function validateGoalText(text: string): string | null {
   const t = text.trim();
-  if (t.length < 3) return "Describe your goal in a few words.";
-  if (t.length > 240) return "Keep the goal under 240 characters — add detail in the description.";
+  const fa = getLang() === "fa";
+  if (t.length < 3) return fa ? "چند کلمه درباره‌ی هدفت بنویس." : "Describe your goal in a few words.";
+  if (!hasLetters(t)) return fa ? "با عدد خالی نمی‌شه هدف نوشت، با کلمه بگو." : "A goal needs words, not just numbers.";
+  if (t.length > 240) return fa ? "هدفت رو کوتاه‌تر بنویس (تا ۲۴۰ حرف)، جزئیات رو بذار تو توضیح." : "Keep the goal under 240 characters — add detail in the description.";
   return null;
 }
 
@@ -597,8 +610,10 @@ export function compileGoal(req: GoalRequest): CompiledPlan {
   if (error) throw new Error(error);
   const subject = extractSubject(req.text);
   const archetype = detectArchetype(req.text);
-  const tech = TECH.test(req.text);
-  const template = archetype.build(subject, tech);
+  const lang = planLanguage(req.text, req.lang);
+  const tech = TECH.test(req.text) || FA_TECH.test(normalizeFa(req.text));
+  const template: TemplateMilestone[] = lang === "fa" ? faTemplate(archetype.id, tech) : archetype.build(subject, tech);
+  const fa = lang === "fa";
 
   const totalMin = template.reduce(
     (sum, m) => sum + m.projects.reduce((s2, p) => s2 + p.tasks.reduce((s3, t) => s3 + t[1], 0), 0),
@@ -609,21 +624,26 @@ export function compileGoal(req: GoalRequest): CompiledPlan {
 
   let target = req.targetDate && isValidDateKey(req.targetDate) ? req.targetDate : null;
   if (target && target <= req.today) {
-    notes.push("The target date is today or in the past, so deadlines are paced from your weekly hours instead.");
+    notes.push(fa ? "تاریخی که زدی گذشته، پس ددلاین‌ها رو با وقت هفتگی‌ات تنظیم کردم." : "The target date is today or in the past, so deadlines are paced from your weekly hours instead.");
     target = null;
   }
   const neededDays = Math.ceil((totalMin / 60 / hoursPerWeek) * 7);
   const spanDays = target ? daysBetween(req.today, target) : Math.max(7, neededDays);
 
+  const weeks = Math.max(1, Math.round(neededDays / 7));
   notes.push(
-    `Estimated effort ≈ ${Math.round(totalMin / 60)}h. At ${hoursPerWeek}h per week that takes about ${Math.max(1, Math.round(neededDays / 7))} week${neededDays > 7 ? "s" : ""}.`,
+    fa
+      ? toFaDigits(`حدود ${Math.round(totalMin / 60)} ساعت کار داره. با هفته‌ای ${hoursPerWeek} ساعت، حدوداً ${weeks} هفته طول می‌کشه.`)
+      : `Estimated effort ≈ ${Math.round(totalMin / 60)}h. At ${hoursPerWeek}h per week that takes about ${weeks} week${neededDays > 7 ? "s" : ""}.`,
   );
   if (target && neededDays > spanDays) {
     notes.push(
-      `That is more than the ${spanDays} days until your target date — consider more hours per week, trimming tasks, or a later date.`,
+      fa
+        ? toFaDigits(`این بیشتر از ${spanDays} روزیه که تا تاریخ هدفت مونده. یا وقت هفتگی رو بیشتر کن، یا چند تا کار رو حذف کن، یا تاریخ رو عقب بنداز.`)
+        : `That is more than the ${spanDays} days until your target date — consider more hours per week, trimming tasks, or a later date.`,
     );
   }
-  if (!target) notes.push("No target date set — milestone deadlines are paced from your weekly hours.");
+  if (!target) notes.push(fa ? "تاریخی نزدی، پس ددلاین مرحله‌ها رو با وقت هفتگی‌ات تنظیم کردم." : "No target date set — milestone deadlines are paced from your weekly hours.");
 
   // Milestone deadlines are spread proportionally to their effort.
   let cumulative = 0;
@@ -651,12 +671,12 @@ export function compileGoal(req: GoalRequest): CompiledPlan {
 
   return {
     title: goalTitle(req.text),
-    description: `${archetype.label} plan for “${subject}”.`,
+    description: fa ? `برنامه‌ی ${FA_LABEL[archetype.id]} برای «${req.text.trim()}».` : `${archetype.label} plan for “${subject}”.`,
     targetDate: target ?? milestones[milestones.length - 1]?.deadline ?? null,
     milestones,
     source: "template",
     model: null,
-    archetype: archetype.label,
+    archetype: fa ? FA_LABEL[archetype.id] : archetype.label,
     notes,
   };
 }
@@ -704,7 +724,7 @@ export function sanitizePlan(raw: unknown, req: GoalRequest, source: PlanSource,
     }
     if (projects.length) milestones.push({ title, description: str(m.description, 400), deadline, projects });
   }
-  if (!milestones.length) throw new Error("The response did not contain a usable plan.");
+  if (!milestones.length) throw new Error(getLang() === "fa" ? "تو جواب مدل برنامه‌ی قابل‌استفاده‌ای نبود." : "The response did not contain a usable plan.");
   const notes = Array.isArray(obj.notes) ? obj.notes.map((n) => str(n, 300)).filter(Boolean).slice(0, 5) : [];
   return {
     title: str(obj.title, 160) || goalTitle(req.text),

@@ -1,53 +1,103 @@
 :root {
   color-scheme: dark;
 
-  /* Surfaces */
+  /* Filled in per theme (see domain/themes.ts). These defaults are the default theme. */
+  --ink: 255 255 255;
+  --well: 0 0 0;
+  --shadow-rgb: 0 0 0;
+  --a300: 196 181 253;
+  --a400: 167 139 250;
+  --a500: 139 92 246;
+  --a600: 124 58 237;
+  --a700: 109 40 217;
+  --alt: 99 102 241;
+  --success-rgb: 74 222 128;
+  --warning-rgb: 251 191 36;
+  --danger-rgb: 251 113 133;
+  --info-rgb: 125 211 252;
+  --plan-default-rgb: 167 139 250;
+  --plan-goal-rgb: 45 212 191;
+  --plan-event-rgb: 251 191 36;
+  --now-rgb: 244 114 182;
+  --glass-rgb: 28 25 44;
+  --overlay-rgb: 5 5 10;
+  --bg-rgb: 9 9 15;
+  --panel-alpha: 0;
+  --bg2-rgb: 17 17 27;
+  --a-bright: 148 102 247;
+  --a-deep: 91 33 182;
+  --a-deepest: 59 29 122;
+  --alt-2: 67 56 202;
+  --danger-2: 225 29 72;
+  --plan-event-2: 245 158 11;
+  --plan-goal-2: 20 184 166;
+  --now-2: 219 39 119;
+  --now-soft: 249 168 212;
+  --glass-strong-rgb: 24 22 38;
+
   --bg: #09090f;
   --bg-2: #11111b;
   --bg-3: #171724;
-  --surface: rgba(255, 255, 255, 0.028);
-  --surface-hover: rgba(255, 255, 255, 0.045);
-  --surface-strong: rgba(255, 255, 255, 0.06);
-  --line: rgba(255, 255, 255, 0.07);
-  --line-strong: rgba(255, 255, 255, 0.12);
-
-  /* Text */
+  --card: #1a1828;
   --text: #f5f3ff;
   --text-2: #a5a1b5;
   --text-3: #6f6b82;
   --text-on-accent: #ffffff;
+  --warning-ink: #fde68a;
+  --danger-ink: #fecdd3;
+  --info-ink: #bae6fd;
+  --title-from: #ffffff;
+  --title-to: #c9c2e6;
+  --cd-dark: #1c1930;
+  --cd-mid: #2b2640;
+  --cd-light: #a79cc9;
+  --cd-sheen: #8e86ad;
+  --cd-tint: #6f5aa8;
+  --relax-bg: #07070c;
+  --on-accent-soft: #ede9fe;
+  --on-danger: #ffe4e8;
+  --cd-tint-2: #6754a0;
+  --on-now: #ffffff;
+  --on-plan-event: #1c1917;
+
+  /* Surfaces */
+  --surface: rgb(var(--ink) / 0.028);
+  --surface-hover: rgb(var(--ink) / 0.045);
+  --surface-strong: rgb(var(--ink) / 0.06);
+  --line: rgb(var(--ink) / 0.07);
+  --line-strong: rgb(var(--ink) / 0.12);
 
   /* Accent */
-  --violet-300: #c4b5fd;
-  --violet-400: #a78bfa;
-  --violet-500: #8b5cf6;
-  --violet-600: #7c3aed;
-  --violet-700: #6d28d9;
+  --violet-300: rgb(var(--a300));
+  --violet-400: rgb(var(--a400));
+  --violet-500: rgb(var(--a500));
+  --violet-600: rgb(var(--a600));
+  --violet-700: rgb(var(--a700));
   --accent: var(--violet-500);
   --accent-bright: var(--violet-400);
-  --accent-soft: rgba(139, 92, 246, 0.14);
-  --accent-softer: rgba(139, 92, 246, 0.08);
-  --accent-line: rgba(167, 139, 250, 0.38);
+  --accent-soft: rgb(var(--a500) / 0.14);
+  --accent-softer: rgb(var(--a500) / 0.08);
+  --accent-line: rgb(var(--a400) / 0.38);
 
   /* Semantic */
-  --success: #4ade80;
-  --success-soft: rgba(74, 222, 128, 0.12);
-  --warning: #fbbf24;
-  --warning-soft: rgba(251, 191, 36, 0.12);
-  --danger: #fb7185;
-  --danger-soft: rgba(251, 113, 133, 0.12);
-  --info: #7dd3fc;
+  --success: rgb(var(--success-rgb));
+  --success-soft: rgb(var(--success-rgb) / 0.12);
+  --warning: rgb(var(--warning-rgb));
+  --warning-soft: rgb(var(--warning-rgb) / 0.12);
+  --danger: rgb(var(--danger-rgb));
+  --danger-soft: rgb(var(--danger-rgb) / 0.12);
+  --info: rgb(var(--info-rgb));
 
-  --priority-1: #6f6b82;
-  --priority-2: #7dd3fc;
-  --priority-3: #fbbf24;
-  --priority-4: #fb7185;
+  --priority-1: var(--text-3);
+  --priority-2: var(--info);
+  --priority-3: var(--warning);
+  --priority-4: var(--danger);
 
   /* Glass */
-  --glass-tint: rgba(28, 25, 44, 0.52);
-  --glass-tint-strong: rgba(24, 22, 38, 0.78);
+  --glass-tint: rgb(var(--glass-rgb) / 0.52);
+  --glass-tint-strong: rgb(var(--glass-strong-rgb) / 0.78);
   --glass-blur: 22px;
-  --glass-rim: rgba(255, 255, 255, 0.16);
+  --glass-rim: rgb(var(--ink) / 0.16);
 
   /* Type */
   --font: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
@@ -75,9 +125,9 @@
   --dur-2: 240ms;
   --dur-3: 420ms;
 
-  --shadow-float: 0 24px 60px -24px rgba(0, 0, 0, 0.75), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
-  --shadow-soft: 0 10px 30px -18px rgba(0, 0, 0, 0.8);
-  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgba(167, 139, 250, 0.75);
+  --shadow-float: 0 24px 60px -24px rgb(var(--shadow-rgb) / 0.75), 0 2px 8px -2px rgb(var(--shadow-rgb) / 0.4);
+  --shadow-soft: 0 10px 30px -18px rgb(var(--shadow-rgb) / 0.8);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgb(var(--a400) / 0.75);
 }
 
 @media (prefers-reduced-motion: reduce) {
