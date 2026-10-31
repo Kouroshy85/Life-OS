@@ -2,7 +2,9 @@ import { ArrowLeft, RefreshCcw, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { aiConfigured } from "../../ai/planProvider";
 import { validateGoalText } from "../../domain/goalCompiler";
+import { num } from "../../domain/locale";
 import type { Goal } from "../../domain/types";
+import { t } from "../../i18n";
 import { applyRevision, previewRevision, useApp, type RevisionPreview } from "../../state/store";
 import { DateInput, NumberInput, TextArea, TextInput } from "../../ui/fields";
 import { Button, Dialog, Field, Switch } from "../../ui/primitives";
@@ -50,17 +52,17 @@ export function ReviseDialog({ goal, open, onClose }: { goal: Goal; open: boolea
       open={open}
       onClose={onClose}
       wide
-      title={preview ? "Review the revised plan" : "Revise plan"}
+      title={preview ? t.reviseReviewTitle : t.reviseTitle}
       subtitle={
         preview
-          ? "Nothing you have worked on is removed."
-          : "Recompile the plan with new wording, timing or pace. Completed, in-progress, edited, manual and planned tasks are always kept."
+          ? t.reviseReviewSub
+          : t.reviseSub
       }
       footer={
         preview ? (
           <>
-            <Button variant="ghost" icon={<ArrowLeft size={15} />} onClick={() => setPreview(null)}>
-              Back
+            <Button variant="ghost" icon={<ArrowLeft size={15} className="flip-rtl" />} onClick={() => setPreview(null)}>
+              {t.back}
             </Button>
             <span className="spacer" />
             <Button
@@ -74,17 +76,17 @@ export function ReviseDialog({ goal, open, onClose }: { goal: Goal; open: boolea
                 onClose();
               }}
             >
-              Apply revision
+              {t.applyRevision}
             </Button>
           </>
         ) : (
           <>
             <span className="spacer" />
             <Button variant="ghost" onClick={onClose}>
-              Cancel
+              {t.cancel}
             </Button>
             <Button variant="primary" onClick={run} disabled={busy}>
-              {busy ? "Compiling…" : "Preview changes"}
+              {busy ? t.compiling : t.previewChanges}
             </Button>
           </>
         )
@@ -96,22 +98,22 @@ export function ReviseDialog({ goal, open, onClose }: { goal: Goal; open: boolea
             <div>
               <ShieldCheck size={16} color="var(--success)" />
               <span>
-                <strong>{s.kept}</strong> kept {s.completedKept > 0 && <span className="faint">({s.completedKept} completed)</span>}
+                <strong>{num(s.kept)}</strong> {t.revKept} {s.completedKept > 0 && <span className="faint">{t.revCompleted(s.completedKept)}</span>}
               </span>
             </div>
             <div>
               <span>
-                <strong>{s.replaced}</strong> untouched generated task{s.replaced === 1 ? "" : "s"} replaced
+                <strong>{num(s.replaced)}</strong> {t.revReplaced(s.replaced)}
               </span>
             </div>
             <div>
               <span>
-                <strong>{s.added}</strong> new task{s.added === 1 ? "" : "s"} added
+                <strong>{num(s.added)}</strong> {t.revAdded(s.added)}
               </span>
             </div>
             {s.skippedDuplicates > 0 && (
               <div className="faint">
-                {s.skippedDuplicates} already covered by tasks you kept
+                {t.revDuplicates(s.skippedDuplicates)}
               </div>
             )}
           </div>
@@ -125,28 +127,28 @@ export function ReviseDialog({ goal, open, onClose }: { goal: Goal; open: boolea
           }}
           style={{ display: "flex", flexDirection: "column", gap: 16 }}
         >
-          <Field label="Goal" error={error}>
+          <Field label={t.goalField} error={error}>
             <TextInput value={text} maxLength={240} onChange={(e) => setText(e.target.value)} />
           </Field>
-          <Field label="Context">
+          <Field label={t.contextField}>
             <TextArea rows={2} value={context} maxLength={600} onChange={(e) => setContext(e.target.value)} />
           </Field>
           <div className="field-row">
-            <Field label="Target date">
+            <Field label={t.targetDate}>
               <DateInput value={targetDate} onChange={setTargetDate} />
             </Field>
-            <Field label="Time per week">
-              <NumberInput value={hours} min={1} max={80} suffix="hours" onChange={setHours} />
+            <Field label={t.timePerWeek}>
+              <NumberInput value={hours} min={1} max={80} suffix={t.hours} onChange={setHours} />
             </Field>
           </div>
           <div className="ai-row">
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 560 }}>Use Claude</div>
+              <div style={{ fontWeight: 560 }}>{t.useClaudeShort}</div>
               <div className="faint" style={{ fontSize: 12.5 }}>
-                {canUseAi ? `Uses ${ai.model} with your key.` : "Not configured — the built-in planner will be used."}
+                {canUseAi ? t.claudeUses(ai.model) : t.claudeOff}
               </div>
             </div>
-            <Switch checked={useAi && canUseAi} disabled={!canUseAi} onChange={setUseAi} label="Use Claude" />
+            <Switch checked={useAi && canUseAi} disabled={!canUseAi} onChange={setUseAi} label={t.useClaudeShort} />
           </div>
           <button type="submit" hidden />
         </form>

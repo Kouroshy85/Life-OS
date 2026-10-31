@@ -1,8 +1,9 @@
 import { Plus, Target, Wand2 } from "lucide-react";
 import { useEffect } from "react";
+import { num, pct } from "../../domain/locale";
+import { t } from "../../i18n";
 import { goalProgress, openComposer, selectGoal, useApp } from "../../state/store";
 import { Bar, Button, Empty } from "../../ui/primitives";
-import { GoalComposer } from "./GoalComposer";
 import { GoalDetail } from "./GoalDetail";
 
 export function GoalsView() {
@@ -20,14 +21,14 @@ export function GoalsView() {
     <div className="page">
       <div className="page-head">
         <div>
-          <div className="eyebrow">Goal Compiler</div>
+          <div className="eyebrow">{t.goalCompiler}</div>
           <h1 className="page-title" tabIndex={-1} data-page-heading>
-            Goals
+            {t.goalsTitle}
           </h1>
-          <p className="page-sub">Turn intentions into milestones, projects and tasks you can actually schedule.</p>
+          <p className="page-sub">{t.goalsSub}</p>
         </div>
         <Button variant="primary" size="lg" icon={<Wand2 size={17} />} onClick={() => openComposer(true)}>
-          New goal
+          {t.newGoal}
         </Button>
       </div>
 
@@ -35,18 +36,18 @@ export function GoalsView() {
         <div className="card rise">
           <Empty
             icon={<Target size={22} />}
-            title="No goals yet"
-            text="Describe something you want to achieve — “Prepare for my university exams” — and Life OS will compile an editable plan."
+            title={t.noGoals}
+            text={t.noGoalsText}
             action={
               <Button variant="primary" icon={<Plus size={16} />} onClick={() => openComposer(true)}>
-                Compile your first goal
+                {t.compileFirst}
               </Button>
             }
           />
         </div>
       ) : (
         <div className="goals-layout">
-          <aside className="goal-list" aria-label="Goals">
+          <aside className="goal-list" aria-label={t.navGoals}>
             {active.map((g, i) => {
               const p = goalProgress(g.id, tasks);
               return (
@@ -59,12 +60,12 @@ export function GoalsView() {
                 >
                   <span className="goal-card__title">
                     {g.title}
-                    {g.isSample && <span className="badge-sample" style={{ marginLeft: 8 }}>Sample</span>}
+                    {g.isSample && <span className="badge-sample" style={{ marginInlineStart: 8 }}>{t.sample}</span>}
                   </span>
                   <span className="goal-card__meta tabular">
-                    <span>{Math.round(p.ratio * 100)}%</span>
+                    <span>{pct(Math.round(p.ratio * 100))}</span>
                     <span className="faint">
-                      {p.done}/{p.total} tasks
+                      {t.tasksCount(num(p.done), num(p.total))}
                     </span>
                   </span>
                   <Bar value={p.ratio} />
@@ -75,7 +76,6 @@ export function GoalsView() {
           {current && <GoalDetail key={current.id} goal={current} />}
         </div>
       )}
-      <GoalComposer />
     </div>
   );
 }

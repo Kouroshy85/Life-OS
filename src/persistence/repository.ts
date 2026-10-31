@@ -5,13 +5,20 @@
  */
 
 import type { CompiledPlan } from "../domain/goalCompiler";
+import { plansToCommitments } from "../domain/plans";
 import type { RevisionPlan } from "../domain/revision";
 import {
   DEFAULT_PREFERENCES,
   type Commitment,
+  type Dream,
+  type Playlist,
+  type Song,
+  type UserQuote,
   type DateKey,
   type Goal,
   type Milestone,
+  type Note,
+  type Plan,
   type Preferences,
   type Project,
   type ScheduleBlock,
@@ -93,14 +100,40 @@ const taskFrom = (r: Row): Task => ({
   completedAt: s(r.completed_at),
 });
 
-const commitmentFrom = (r: Row): Commitment => ({
+function parseDates(v: unknown): string[] | null {
+  if (v == null) return null;
+  try {
+    const parsed = JSON.parse(String(v));
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+const planFrom = (r: Row): Plan => ({
   id: String(r.id),
+  type: r.type as Plan["type"],
   title: String(r.title),
-  kind: r.kind as Commitment["kind"],
-  date: s(r.date),
+  description: String(r.description ?? ""),
   weekdays: Number(r.weekdays),
+  dates: parseDates(r.dates),
+  validFrom: s(r.valid_from),
   start: Number(r.start_min),
   end: Number(r.end_min),
+  goalId: s(r.goal_id),
+  isBreak: b(r.is_break),
+  isSample: b(r.is_sample),
+  createdAt: String(r.created_at),
+  updatedAt: String(r.updated_at),
+});
+
+const noteFrom = (r: Row): Note => ({
+  id: String(r.id),
+  title: String(r.title),
+  description: String(r.description ?? ""),
+  urgency: Number(r.urgency) as Note["urgency"],
+  remindAt: s(r.remind_at),
+  reminded: b(r.reminded),
   createdAt: String(r.created_at),
 });
 
@@ -211,6 +244,23 @@ function blockRow(bl: ScheduleBlock): Record<string, SqlParam> {
   };
 }
 
+export function makePlan(partial: Partial<Plan> & Pick<Plan, "type" | "title" | "start" | "end">): Plan {
+  const ts = nowIso();
+  return {
+    id: newId(),
+    description: "",
+    weekdays: 0,
+    dates: null,
+    validFrom: null,
+    goalId: null,
+    isBreak: false,
+    isSample: false,
+    createdAt: ts,
+    updatedAt: ts,
+    ...partial,
+  };
+}
+
 export function makeTask(partial: Partial<Task> & { title: string }): Task {
   const ts = nowIso();
   return {
@@ -262,7 +312,14 @@ export interface Snapshot {
   milestones: Milestone[];
   projects: Project[];
   tasks: Task[];
+  plans: Plan[];
+  /** Plans seen as fixed time, derived for the day scheduler. */
   commitments: Commitment[];
+  notes: Note[];
+  dreams: Dream[];
+  playlists: Playlist[];
+  songs: Song[];
+  userQuotes: UserQuote[];
   blocks: ScheduleBlock[];
   dayPlans: Record<DateKey, DayPlanRow>;
   skips: Record<DateKey, string[]>;
@@ -284,18 +341,24 @@ export class Repository {
   }
 
   async loadSnapshot(): Promise<Snapshot> {
-    const [goals, milestones, projects, tasks, commitments, blocks, plans, skips, events, settings] = await Promise.all([
+    const [goals, milestones, projects, tasks, planRows, noteRows, dreamRows, playlistRows, songRows, quoteRows, blocks, dayPlanRows, skips, events, settings] = await Promise.all([
       this.db.select<Row>("SELECT * FROM goals ORDER BY sort_order, created_at"),
       this.db.select<Row>("SELECT * FROM milestones ORDER BY sort_order, created_at"),
       this.db.select<Row>("SELECT * FROM projects ORDER BY sort_order, created_at"),
       this.db.select<Row>("SELECT * FROM tasks ORDER BY sort_order, created_at"),
-      this.db.select<Row>("SELECT * FROM commitments ORDER BY start_min"),
+      this.db.select<Row>("SELECT * FROM plans ORDER BY start_min"),
+      this.db.select<Row>("SELECT * FROM notes ORDER BY urgency DESC, created_at DESC"),
+      this.db.select<Row>("SELECT * FROM dreams ORDER BY created_at DESC"),
+      this.db.select<Row>("SELECT * FROM playlists ORDER BY created_at"),
+      this.db.select<Row>("SELECT * FROM songs ORDER BY sort_order, created_at"),
+      this.db.select<Row>("SELECT * FROM quotes ORDER BY created_at"),
       this.db.select<Row>("SELECT * FROM schedule_blocks ORDER BY date, start_min"),
       this.db.select<Row>("SELECT * FROM day_plans"),
       this.db.select<Row>("SELECT * FROM day_skips"),
       this.db.select<Row>("SELECT * FROM task_events ORDER BY at DESC LIMIT 1000"),
       this.db.select<Row>("SELECT * FROM settings"),
     ]);
+    const plans = planRows.map(planFrom);
     const settingsMap = Object.fromEntries(settings.map((r) => [String(r.key), String(r.value)]));
     const parseJson = <T,>(key: string, fallback: T): T => {
       try {
@@ -314,10 +377,26 @@ export class Repository {
       milestones: milestones.map(milestoneFrom),
       projects: projects.map(projectFrom),
       tasks: tasks.map(taskFrom),
-      commitments: commitments.map(commitmentFrom),
+      plans,
+      commitments: plansToCommitments(plans),
+      notes: noteRows.map(noteFrom),
+      dreams: dreamRows.map((r) => ({ id: String(r.id), title: String(r.title), body: String(r.body ?? ""), createdAt: String(r.created_at) })),
+      playlists: playlistRows.map((r) => ({ id: String(r.id), name: String(r.name), icon: String(r.icon), createdAt: String(r.created_at) })),
+      songs: songRows.map((r) => ({
+        id: String(r.id),
+        playlistId: String(r.playlist_id),
+        title: String(r.title),
+        artist: String(r.artist ?? ""),
+        ext: String(r.ext),
+        sizeBytes: Number(r.size_bytes),
+        durationSec: Number(r.duration_sec),
+        sortOrder: Number(r.sort_order),
+        createdAt: String(r.created_at),
+      })),
+      userQuotes: quoteRows.map((r) => ({ id: String(r.id), text: String(r.text), createdAt: String(r.created_at) })),
       blocks: blocks.map(blockFrom),
       dayPlans: Object.fromEntries(
-        plans.map((r) => [
+        dayPlanRows.map((r) => [
           String(r.date),
           {
             date: String(r.date),
@@ -593,20 +672,85 @@ export class Repository {
     });
   }
 
-  // ---- commitments ----------------------------------------------------------------------
+  // ---- plans and notes ---------------------------------------------------------------
 
-  async saveCommitment(c: Commitment) {
+  planUpsert(p: Plan): SqlStatement {
+    return {
+      sql: `INSERT INTO plans (id, type, title, description, weekdays, dates, valid_from, start_min, end_min, goal_id, is_break, is_sample, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET type = excluded.type, title = excluded.title, description = excluded.description,
+              weekdays = excluded.weekdays, dates = excluded.dates, valid_from = excluded.valid_from, start_min = excluded.start_min,
+              end_min = excluded.end_min, goal_id = excluded.goal_id, updated_at = excluded.updated_at`,
+      params: [
+        p.id, p.type, p.title, p.description, p.weekdays, p.dates ? JSON.stringify(p.dates) : null, p.validFrom,
+        p.start, p.end, p.goalId, bool(p.isBreak), bool(p.isSample), p.createdAt, nowIso(),
+      ],
+    };
+  }
+
+  async deletePlan(id: string) {
+    await this.db.execute("DELETE FROM plans WHERE id = ?", [id]);
+  }
+
+  async saveNote(n: Note) {
     await this.db.execute(
-      `INSERT INTO commitments (id, title, kind, date, weekdays, start_min, end_min, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET title = excluded.title, kind = excluded.kind, date = excluded.date,
-         weekdays = excluded.weekdays, start_min = excluded.start_min, end_min = excluded.end_min`,
-      [c.id, c.title, c.kind, c.date, c.weekdays, c.start, c.end, c.createdAt],
+      `INSERT INTO notes (id, title, description, urgency, remind_at, reminded, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET title = excluded.title, description = excluded.description, urgency = excluded.urgency,
+         remind_at = excluded.remind_at, reminded = excluded.reminded`,
+      [n.id, n.title, n.description, n.urgency, n.remindAt, bool(n.reminded), n.createdAt],
     );
   }
 
-  async deleteCommitment(id: string) {
-    await this.db.execute("DELETE FROM commitments WHERE id = ?", [id]);
+  /** Swaps a goal's weekly sessions for a new set in one transaction, so it's never left half done. */
+  async replaceGoalSessions(goalId: string, sessions: Plan[]) {
+    await this.db.batch([{ sql: "DELETE FROM plans WHERE goal_id = ?", params: [goalId] }, ...sessions.map((p) => this.planUpsert(p))]);
+  }
+
+  async saveDream(d: Dream) {
+    await this.db.execute(
+      `INSERT INTO dreams (id, title, body, created_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET title = excluded.title, body = excluded.body`,
+      [d.id, d.title, d.body, d.createdAt],
+    );
+  }
+
+  async deleteDream(id: string) {
+    await this.db.execute("DELETE FROM dreams WHERE id = ?", [id]);
+  }
+
+  async savePlaylist(p: Playlist) {
+    await this.db.execute(
+      `INSERT INTO playlists (id, name, icon, created_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, icon = excluded.icon`,
+      [p.id, p.name, p.icon, p.createdAt],
+    );
+  }
+
+  async deletePlaylist(id: string) {
+    await this.db.execute("DELETE FROM playlists WHERE id = ?", [id]);
+  }
+
+  async saveSong(s: Song) {
+    await this.db.execute(
+      `INSERT INTO songs (id, playlist_id, title, artist, ext, size_bytes, duration_sec, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [s.id, s.playlistId, s.title, s.artist, s.ext, s.sizeBytes, s.durationSec, s.sortOrder, s.createdAt],
+    );
+  }
+
+  async deleteSong(id: string) {
+    await this.db.execute("DELETE FROM songs WHERE id = ?", [id]);
+  }
+
+  async saveQuote(q: UserQuote) {
+    await this.db.execute("INSERT INTO quotes (id, text, created_at) VALUES (?, ?, ?)", [q.id, q.text, q.createdAt]);
+  }
+
+  async deleteQuote(id: string) {
+    await this.db.execute("DELETE FROM quotes WHERE id = ?", [id]);
+  }
+
+  async deleteNote(id: string) {
+    await this.db.execute("DELETE FROM notes WHERE id = ?", [id]);
   }
 
   // ---- schedule blocks & day plans -------------------------------------------------------
@@ -675,14 +819,14 @@ export class Repository {
     await this.db.batch([
       { sql: "DELETE FROM tasks WHERE is_sample = 1" },
       { sql: "DELETE FROM goals WHERE is_sample = 1" },
-      { sql: "DELETE FROM commitments WHERE id LIKE 'sample-%'" },
+      { sql: "DELETE FROM plans WHERE is_sample = 1" },
       { sql: "DELETE FROM settings WHERE key = 'flag.sampleLoaded'" },
     ]);
   }
 
   async resetAll() {
     await this.db.batch(
-      ["task_events", "day_skips", "day_plans", "schedule_blocks", "commitments", "tasks", "projects", "milestones", "goals", "settings"].map(
+      ["task_events", "day_skips", "day_plans", "schedule_blocks", "plans", "notes", "dreams", "songs", "playlists", "quotes", "tasks", "projects", "milestones", "goals", "settings"].map(
         (t) => ({ sql: `DELETE FROM ${t}` }),
       ),
     );

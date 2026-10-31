@@ -1,3 +1,4 @@
+import { getLang, num, toLatinDigits } from "./locale";
 import type { DateKey, Minutes } from "./types";
 
 export const DAY_MINUTES = 24 * 60;
@@ -41,12 +42,12 @@ export function minutesOfDay(d: Date): Minutes {
 
 export function formatClock(min: Minutes): string {
   const m = Math.max(0, Math.min(DAY_MINUTES, Math.round(min)));
-  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+  return num(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
 }
 
 /** Parses "HH:MM" into minutes; returns null for invalid input. */
 export function parseClock(text: string): Minutes | null {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(text.trim());
+  const match = /^(\d{1,2}):(\d{2})$/.exec(toLatinDigits(text).trim());
   if (!match) return null;
   const h = Number(match[1]);
   const m = Number(match[2]);
@@ -56,9 +57,13 @@ export function parseClock(text: string): Minutes | null {
 
 export function formatDuration(min: Minutes): string {
   const m = Math.round(min);
-  if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
   const rest = m % 60;
+  if (getLang() === "fa") {
+    if (m < 60) return `${num(m)} دقیقه`;
+    return rest ? `${num(h)} ساعت و ${num(rest)} دقیقه` : `${num(h)} ساعت`;
+  }
+  if (m < 60) return `${m}m`;
   return rest ? `${h}h ${rest}m` : `${h}h`;
 }
 
@@ -66,28 +71,47 @@ export function roundUpTo(min: Minutes, step: number): Minutes {
   return Math.ceil(min / step) * step;
 }
 
-const LONG_DATE = new Intl.DateTimeFormat(undefined, {
-  weekday: "long",
-  month: "long",
-  day: "numeric",
-});
-const SHORT_DATE = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+/** Persian uses the Solar Hijri calendar and Persian digits, the way dates are normally read in Iran. */
+const dateLocale = () => (getLang() === "fa" ? "fa-IR" : "en-US");
 
 export function formatLongDate(key: DateKey): string {
-  return LONG_DATE.format(parseDateKey(key));
+  return new Intl.DateTimeFormat(dateLocale(), { weekday: "long", month: "long", day: "numeric" }).format(parseDateKey(key));
 }
 
 export function formatShortDate(key: DateKey): string {
-  return SHORT_DATE.format(parseDateKey(key));
+  return new Intl.DateTimeFormat(dateLocale(), { month: getLang() === "fa" ? "long" : "short", day: "numeric" }).format(parseDateKey(key));
+}
+
+export function formatFullDate(key: DateKey): string {
+  return new Intl.DateTimeFormat(dateLocale(), { year: "numeric", month: getLang() === "fa" ? "long" : "short", day: "numeric" }).format(parseDateKey(key));
 }
 
 /** "today", "tomorrow", "in 3 days", "2 days ago", or a short date. */
 export function relativeDay(key: DateKey, today: DateKey): string {
   const diff = daysBetween(today, key);
-  if (diff === 0) return "today";
-  if (diff === 1) return "tomorrow";
-  if (diff === -1) return "yesterday";
-  if (diff > 1 && diff < 7) return `in ${diff} days`;
-  if (diff < -1 && diff > -7) return `${-diff} days ago`;
+  const fa = getLang() === "fa";
+  if (diff === 0) return fa ? "امروز" : "today";
+  if (diff === 1) return fa ? "فردا" : "tomorrow";
+  if (diff === -1) return fa ? "دیروز" : "yesterday";
+  if (diff > 1 && diff < 7) return fa ? `${num(diff)} روز دیگه` : `in ${diff} days`;
+  if (diff < -1 && diff > -7) return fa ? `${num(-diff)} روز پیش` : `${-diff} days ago`;
   return formatShortDate(key);
+}
+
+export function formatMonthYear(key: DateKey): string {
+  return new Intl.DateTimeFormat(dateLocale(), { month: "long", year: "numeric" }).format(parseDateKey(key));
+}
+
+/** A logical-day minute as a clock time: 1500 reads as 01:00. */
+export const formatDayClock = (min: Minutes) => formatClock(min === 1440 ? 0 : min % 1440);
+
+/** Local date and time as a sortable key, always in Latin digits. */
+export function dateTimeKey(date: DateKey, min: Minutes): string {
+  return `${date}T${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
+}
+
+export function parseDateTimeKey(key: string): { date: DateKey; min: Minutes } {
+  const [date, time] = key.split("T");
+  const [h, m] = time.split(":").map(Number);
+  return { date, min: h * 60 + m };
 }

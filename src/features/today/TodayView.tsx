@@ -1,8 +1,10 @@
-import { ArrowRight, CalendarClock, CalendarRange, Check, Clock3, Flame, ListTodo, Play, Sparkles, SunMedium, Target, Timer, Wand2 } from "lucide-react";
+import { ArrowRight, CalendarRange, Check, Clock3, Flame, ListTodo, Play, Sparkles, SunMedium, Target, Timer, Wand2 } from "lucide-react";
 import { subtract, totalLength } from "../../domain/intervals";
+import { num } from "../../domain/locale";
 import { rankTasks } from "../../domain/scheduler";
 import { formatClock, formatDuration, formatLongDate, toDateKey } from "../../domain/time";
 import type { ScheduleBlock, Task } from "../../domain/types";
+import { explain, t } from "../../i18n";
 import { commitmentsOn, isOpen, liveBlocks, proposedBlocks, toSchedulable, unplannedMinutes } from "../../state/planning";
 import {
   completeBlock,
@@ -13,22 +15,14 @@ import {
   navigate,
   openComposer,
   proposeDay,
-  scheduleTask,
   selectGoal,
   setPlannerDate,
   startBlock,
   useApp,
 } from "../../state/store";
 import { LiquidGlass } from "../../ui/LiquidGlass";
-import { Button, IconButton, ProgressRing } from "../../ui/primitives";
-import { TaskMeta } from "../../ui/taskBits";
-
-function greeting(min: number) {
-  if (min < 5 * 60) return "Working late";
-  if (min < 12 * 60) return "Good morning";
-  if (min < 17 * 60) return "Good afternoon";
-  return "Good evening";
-}
+import { LiveClock, NotesSection } from "./NotesDeck";
+import { Button, ProgressRing } from "../../ui/primitives";
 
 export function TodayView() {
   const s = useApp();
@@ -40,7 +34,7 @@ export function TodayView() {
   const taskMap = new Map(s.tasks.map((t) => [t.id, t]));
   const goals = s.goals.filter((g) => !g.archived);
 
-  const isNewUser = goals.length === 0 && s.tasks.length === 0 && s.commitments.length === 0;
+  const isNewUser = goals.length === 0 && s.tasks.length === 0 && s.plans.length === 0 && s.notes.length === 0;
 
   const current = blocks.find((b) => b.kind === "task" && (b.state === "in_progress" || (b.state === "planned" && b.start <= nowMin && nowMin < b.end)));
   const upcoming = blocks.filter((b) => b.state === "planned" && b.start >= nowMin).sort((a, b) => a.start - b.start);
@@ -59,13 +53,15 @@ export function TodayView() {
   ).map((x) => x.task);
 
   const summary = (() => {
-    if (isNewUser) return "Let's set up your first plan.";
+    if (isNewUser) return t.todayFirstPlan;
     const parts: string[] = [];
-    if (remainingScheduled > 0) parts.push(`${formatDuration(remainingScheduled)} of planned work ahead`);
-    if (freeLeft > 0) parts.push(`${formatDuration(freeLeft)} still unplanned`);
-    else if (nowMin >= s.prefs.workEnd) parts.push("your working hours are over");
-    if (backlog.length) parts.push(`${backlog.length} in the backlog`);
-    return parts.length ? `${parts.join(" · ")}.` : "Nothing scheduled yet today.";
+    if (remainingScheduled > 0) parts.push(t.todayPlannedAhead(formatDuration(remainingScheduled)));
+    if (freeLeft > 0) parts.push(t.todayUnplanned(formatDuration(freeLeft)));
+    else if (nowMin >= s.prefs.workEnd) parts.push(t.todayHoursOver);
+    if (backlog.length) parts.push(t.todayInBacklog(num(backlog.length)));
+    if (!parts.length) return t.todayNothing;
+    const line = `${parts.join(" · ")}.`;
+    return line[0].toUpperCase() + line.slice(1);
   })();
 
   const planToday = async () => {
@@ -79,9 +75,12 @@ export function TodayView() {
       <div className="page-head">
         <div>
           <div className="eyebrow">{formatLongDate(today)}</div>
-          <h1 className="page-title" tabIndex={-1} data-page-heading>
-            {greeting(nowMin)}
-          </h1>
+          <div className="today-head">
+            <h1 className="page-title" tabIndex={-1} data-page-heading>
+              {t.greeting(nowMin)}
+            </h1>
+            <LiveClock />
+          </div>
           <p className="page-sub">{summary}</p>
         </div>
       </div>
@@ -94,63 +93,35 @@ export function TodayView() {
             <NowCard current={current} next={next} taskMap={taskMap} hasProposal={proposal.length > 0} hasBlocks={blocks.some((b) => b.kind === "task")} backlogCount={backlog.length} onPlan={planToday} nowMin={nowMin} workEnd={s.prefs.workEnd} />
           </LiquidGlass>
 
-          <div className="stats rise rise-1" aria-label="Today in numbers">
-            <Stat icon={<SunMedium size={15} />} label="Unplanned time left" value={formatDuration(freeLeft)} hint={`until ${formatClock(s.prefs.workEnd)}`} />
-            <Stat icon={<Clock3 size={15} />} label="Planned ahead" value={formatDuration(remainingScheduled)} hint={`${upcoming.filter((b) => b.kind === "task").length} sessions`} />
-            <Stat icon={<Check size={15} />} label="Completed today" value={String(completedToday)} hint={focusedMin ? `${formatDuration(focusedMin)} of sessions done` : "tasks finished"} />
-            <Stat icon={<ListTodo size={15} />} label="Backlog" value={String(backlog.length)} hint="waiting for a slot" />
+          <div className="stats rise rise-1" aria-label={t.todayNumbers}>
+            <Stat icon={<SunMedium size={15} />} label={t.statUnplanned} value={formatDuration(freeLeft)} hint={t.statUntil(formatClock(s.prefs.workEnd))} />
+            <Stat icon={<Clock3 size={15} />} label={t.statPlanned} value={formatDuration(remainingScheduled)} hint={t.statSessions(num(upcoming.filter((b) => b.kind === "task").length))} />
+            <Stat icon={<Check size={15} />} label={t.statCompleted} value={num(completedToday)} hint={focusedMin ? t.statSessionsDone(formatDuration(focusedMin)) : t.statTasksFinished} />
+            <Stat icon={<ListTodo size={15} />} label={t.statBacklog} value={num(backlog.length)} hint={t.statWaiting} />
           </div>
 
           <section className="card rise rise-2 today-schedule" aria-labelledby="sched-title">
             <div className="card__title">
-              <span id="sched-title">Rest of today</span>
+              <span id="sched-title">{t.restOfToday}</span>
               <Button size="sm" variant="ghost" icon={<CalendarRange size={14} />} onClick={() => { setPlannerDate(today); navigate("planner"); }}>
-                Open planner
+                {t.openPlanner}
               </Button>
             </div>
             <Agenda blocks={blocks} commitments={commitments} taskMap={taskMap} nowMin={nowMin} />
           </section>
 
-          <section className="card rise rise-2 today-priorities" aria-labelledby="prio-title">
-            <div className="card__title">
-              <span id="prio-title">Next priorities</span>
-              <span className="faint" style={{ fontWeight: 500 }}>Unscheduled, by urgency</span>
-            </div>
-            {backlog.length === 0 ? (
-              <p className="faint" style={{ fontSize: 13.5 }}>
-                Nothing waiting. Send tasks from a goal to the planner, or add a quick task in the Planner.
-              </p>
-            ) : (
-              <ul className="prio-list">
-                {backlog.slice(0, 5).map((t) => (
-                  <li key={t.id}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div className="prio-list__title">{t.title}</div>
-                      <div className="taskrow__meta">
-                        <TaskMeta task={t} today={today} />
-                      </div>
-                    </div>
-                    {nowMin < s.prefs.workEnd && (
-                      <IconButton label={`Schedule “${t.title}” in today's next free slot`} onClick={() => scheduleTask(t.id, today)}>
-                        <CalendarClock size={16} />
-                      </IconButton>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <NotesSection />
 
           <section className="today-goals rise rise-3" aria-labelledby="goals-title">
             <div className="today-goals__head">
-              <h2 className="section-title" id="goals-title">Goal progress</h2>
+              <h2 className="section-title" id="goals-title">{t.goalProgress}</h2>
               <Button size="sm" variant="ghost" icon={<Wand2 size={14} />} onClick={() => openComposer(true)}>
-                New goal
+                {t.newGoal}
               </Button>
             </div>
             {goals.length === 0 ? (
               <div className="card">
-                <p className="muted">No goals yet. Compile one to see progress here.</p>
+                <p className="muted">{t.noGoalsToday}</p>
               </div>
             ) : (
               <div className="goal-tiles">
@@ -165,16 +136,16 @@ export function TodayView() {
                     })[0];
                   return (
                     <button key={g.id} type="button" className="goal-tile" onClick={() => selectGoal(g.id)}>
-                      <ProgressRing value={p.ratio} size={54} stroke={5} label={`${Math.round(p.ratio * 100)}`} />
+                      <ProgressRing value={p.ratio} size={54} stroke={5} label={num(Math.round(p.ratio * 100))} />
                       <span className="goal-tile__body">
                         <span className="goal-tile__title">
-                          {g.title} {g.isSample && <span className="badge-sample">Sample</span>}
+                          {g.title} {g.isSample && <span className="badge-sample">{t.sample}</span>}
                         </span>
                         <span className="faint goal-tile__next">
-                          {nextTask ? <>Next: {nextTask.title}</> : p.total ? "All tasks complete" : "No tasks yet"}
+                          {nextTask ? <>{t.nextTask}{nextTask.title}</> : p.total ? t.allComplete : t.noTasksYet}
                         </span>
                       </span>
-                      <ArrowRight size={16} className="goal-tile__arrow" />
+                      <ArrowRight size={16} className="goal-tile__arrow flip-rtl" />
                     </button>
                   );
                 })}
@@ -226,12 +197,12 @@ function NowCard({
   if (hasProposal) {
     return (
       <div className="now">
-        <div className="eyebrow now__eyebrow"><Sparkles size={13} /> Proposal waiting</div>
-        <h2 className="now__title">Your day plan is ready to review</h2>
-        <p className="muted">Accept it, adjust blocks by hand, or reject it — nothing changes until you decide.</p>
+        <div className="eyebrow now__eyebrow"><Sparkles size={13} /> {t.proposalWaiting}</div>
+        <h2 className="now__title">{t.proposalReady}</h2>
+        <p className="muted">{t.proposalReadyText}</p>
         <div className="now__actions">
-          <Button variant="primary" icon={<ArrowRight size={16} />} onClick={() => navigate("planner")}>
-            Review proposal
+          <Button variant="primary" icon={<ArrowRight size={16} className="flip-rtl" />} onClick={() => navigate("planner")}>
+            {t.reviewProposal}
           </Button>
         </div>
       </div>
@@ -241,33 +212,33 @@ function NowCard({
     const over = nowMin >= workEnd;
     return (
       <div className="now">
-        <div className="eyebrow now__eyebrow"><Flame size={13} /> {hasBlocks ? "All done" : "No plan yet"}</div>
+        <div className="eyebrow now__eyebrow"><Flame size={13} /> {hasBlocks ? t.nowAllDone : t.nowNoPlan}</div>
         <h2 className="now__title">
-          {over ? "Working hours are over" : hasBlocks ? "Nothing else scheduled today" : backlogCount ? "Turn your backlog into a realistic day" : "Start by giving the planner something to plan"}
+          {over ? t.nowHoursOver : hasBlocks ? t.nowNothingElse : backlogCount ? t.nowTurnBacklog : t.nowGiveTasks}
         </h2>
         <p className="muted">
           {over
-            ? "Tomorrow can be planned from the Planner whenever you're ready."
+            ? t.nowTomorrow
             : backlogCount
-              ? `${backlogCount} task${backlogCount === 1 ? " is" : "s are"} waiting. The planner fits them around your commitments and explains every choice.`
-              : "Add a task or send tasks from one of your goals to the planner."}
+              ? t.nowWaiting(backlogCount)
+              : t.nowAddTask}
         </p>
         <div className="now__actions">
           {over ? (
             <Button variant="glass" icon={<CalendarRange size={15} />} onClick={() => navigate("planner")}>
-              Open planner
+              {t.openPlanner}
             </Button>
           ) : backlogCount ? (
             <Button variant="primary" icon={<Sparkles size={15} />} onClick={onPlan}>
-              Plan my day
+              {t.planMyDay}
             </Button>
           ) : (
             <>
               <Button variant="primary" icon={<Target size={15} />} onClick={() => navigate("goals")}>
-                Go to goals
+                {t.goToGoals}
               </Button>
               <Button variant="glass" onClick={() => navigate("planner")}>
-                Open planner
+                {t.openPlanner}
               </Button>
             </>
           )}
@@ -281,28 +252,28 @@ function NowCard({
   return (
     <div className="now">
       <div className="eyebrow now__eyebrow">
-        {running ? <><span className="pulse" /> In progress</> : live ? "Scheduled now" : `Up next · ${formatClock(block.start)}`}
+        {running ? <><span className="pulse" /> {t.nowInProgress}</> : live ? t.nowScheduled : t.nowUpNext(formatClock(block.start))}
       </div>
       <h2 className="now__title">{task.title}</h2>
       <div className="now__meta tabular">
         <span>{formatClock(block.start)}–{formatClock(block.end)}</span>
         <span className="faint">·</span>
-        <span>{live && minsLeft > 0 ? `${formatDuration(minsLeft)} left` : live ? "running over" : `in ${formatDuration(block.start - nowMin)}`}</span>
-        {block.partCount > 1 && <span className="faint">· session {block.part}/{block.partCount}</span>}
+        <span>{live && minsLeft > 0 ? t.durationLeft(formatDuration(minsLeft)) : live ? t.runningOver : t.inDuration(formatDuration(block.start - nowMin))}</span>
+        {block.partCount > 1 && <span className="faint">{t.sessionShort(num(block.part), num(block.partCount))}</span>}
       </div>
-      <p className="now__why">{block.reason}</p>
+      <p className="now__why">{explain(block.reason)}</p>
       <div className="now__actions">
         {!running && (
           <Button variant="primary" icon={<Play size={14} />} onClick={() => startBlock(block.id)}>
-            Start now
+            {t.startNow}
           </Button>
         )}
         <Button variant={running ? "primary" : "glass"} icon={<Check size={15} />} onClick={() => completeBlock(block.id)}>
-          Mark done
+          {t.markDone}
         </Button>
         {running && (
-          <Button variant="glass" icon={<Timer size={15} />} onClick={() => extendBlock(block.id, 15)} title="Running long — extend by 15 minutes and recalculate">
-            Need 15 more min
+          <Button variant="glass" icon={<Timer size={15} />} onClick={() => extendBlock(block.id, 15)} title={t.need15Title}>
+            {t.need15}
           </Button>
         )}
       </div>
@@ -312,10 +283,10 @@ function NowCard({
 
 function Agenda({ blocks, commitments, taskMap, nowMin }: { blocks: ScheduleBlock[]; commitments: ReturnType<typeof commitmentsOn>; taskMap: Map<string, Task>; nowMin: number }) {
   const items = [
-    ...blocks.filter((b) => b.end > nowMin || b.state === "in_progress").map((b) => ({ key: b.id, start: b.start, end: b.end, title: b.kind === "break" ? "Break" : (taskMap.get(b.taskId ?? "")?.title ?? "Task"), kind: b.kind === "break" ? "break" : "task", state: b.state })),
+    ...blocks.filter((b) => b.end > nowMin || b.state === "in_progress").map((b) => ({ key: b.id, start: b.start, end: b.end, title: b.kind === "break" ? t.breakLabel : (taskMap.get(b.taskId ?? "")?.title ?? t.fallbackTask), kind: b.kind === "break" ? "break" : "task", state: b.state })),
     ...commitments.filter((c) => c.end > nowMin).map((c) => ({ key: c.id, start: c.start, end: c.end, title: c.title, kind: c.kind === "break" ? "break" : "commitment", state: "planned" as const })),
   ].sort((a, b) => a.start - b.start);
-  if (!items.length) return <p className="faint" style={{ fontSize: 13.5 }}>Nothing left on today's timeline.</p>;
+  if (!items.length) return <p className="faint" style={{ fontSize: 13.5 }}>{t.agendaEmpty}</p>;
   return (
     <ol className="agenda">
       {items.slice(0, 8).map((i) => (
@@ -323,10 +294,10 @@ function Agenda({ blocks, commitments, taskMap, nowMin }: { blocks: ScheduleBloc
           <span className="agenda__time tabular">{formatClock(i.start)}</span>
           <span className="agenda__bar" />
           <span className="agenda__title">{i.title}</span>
-          <span className="agenda__dur faint tabular">{i.state === "in_progress" ? "now" : formatDuration(i.end - i.start)}</span>
+          <span className="agenda__dur faint tabular">{i.state === "in_progress" ? t.agendaNow : formatDuration(i.end - i.start)}</span>
         </li>
       ))}
-      {items.length > 8 && <li className="faint" style={{ fontSize: 12.5, paddingLeft: 64 }}>+{items.length - 8} more</li>}
+      {items.length > 8 && <li className="faint" style={{ fontSize: 12.5, paddingInlineStart: 64 }}>{t.agendaMore(num(items.length - 8))}</li>}
     </ol>
   );
 }
@@ -335,43 +306,43 @@ function Welcome() {
   return (
     <div className="welcome rise">
       <LiquidGlass className="welcome__hero" radius={30} bezel={20} strength={40}>
-        <div className="eyebrow now__eyebrow"><Sparkles size={13} /> Welcome to Life OS</div>
-        <h2 className="welcome__title">Design your days around what matters.</h2>
-        <p className="muted welcome__lead">Compile a goal into a plan, tell the planner when you work, and let it build a realistic day — with a reason for every block.</p>
+        <div className="eyebrow now__eyebrow"><Sparkles size={13} /> {t.welcome}</div>
+        <h2 className="welcome__title">{t.welcomeTitle}</h2>
+        <p className="muted welcome__lead">{t.welcomeLead}</p>
         <div className="now__actions">
           <Button variant="primary" size="lg" icon={<Wand2 size={17} />} onClick={() => openComposer(true)}>
-            Compile your first goal
+            {t.compileFirst}
           </Button>
-          <Button variant="glass" size="lg" onClick={() => navigate("planner")}>
-            Set working hours
+          <Button variant="glass" size="lg" onClick={() => navigate("settings")}>
+            {t.setWorkingHours}
           </Button>
         </div>
       </LiquidGlass>
       <ol className="welcome__steps">
         <li className="card">
-          <span className="welcome__num">1</span>
-          <strong>Compile a goal</strong>
-          <p className="muted">Write it in your own words. Get milestones, projects and tasks you can edit.</p>
+          <span className="welcome__num">{num(1)}</span>
+          <strong>{t.step1Title}</strong>
+          <p className="muted">{t.step1Text}</p>
         </li>
         <li className="card">
-          <span className="welcome__num">2</span>
-          <strong>Set your day</strong>
-          <p className="muted">Working hours, focus hours, breaks and fixed commitments.</p>
+          <span className="welcome__num">{num(2)}</span>
+          <strong>{t.step2Title}</strong>
+          <p className="muted">{t.step2Text}</p>
         </li>
         <li className="card">
-          <span className="welcome__num">3</span>
-          <strong>Plan and adapt</strong>
-          <p className="muted">Accept a proposed schedule, then let it adapt when things run long.</p>
+          <span className="welcome__num">{num(3)}</span>
+          <strong>{t.step3Title}</strong>
+          <p className="muted">{t.step3Text}</p>
         </li>
       </ol>
       <div className="welcome__sample">
-        <span className="faint">Just looking around?</span>
+        <span className="faint">{t.justLooking}</span>
         <Button size="sm" variant="ghost" onClick={loadSampleData}>
-          Load sample data
+          {t.loadSample}
         </Button>
-        <span className="faint">— clearly marked, removable in Settings ·</span>
+        <span className="faint">{t.sampleNote}</span>
         <Button size="sm" variant="ghost" onClick={dismissWelcome}>
-          Skip intro
+          {t.skipIntro}
         </Button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { explain } from "../i18n";
 import { findOverlaps } from "../domain/scheduler";
 import { DEFAULT_PREFERENCES, type Commitment, type ScheduleBlock, type Task } from "../domain/types";
 import { makeTask } from "../persistence/repository";
@@ -91,9 +92,9 @@ describe("planning service", () => {
     s = apply(s, rf.changes);
     const day = s.blocks.filter((x) => x.date === DATE);
     expect(findOverlaps(day)).toEqual([]);
-    expect(day.find((x) => x.taskId === b.id)!.reason).toMatch(/Moved from 10:00 to 10:30 because “A” ran 30m over/);
+    expect(explain(day.find((x) => x.taskId === b.id)!.reason)).toMatch(/Moved from 10:00 to 10:30 because “A” ran 30m over/);
     // C no longer fits in one sitting and minimum session is 7h → backlog with an explanation.
-    expect(rf.notes.find((n) => n.taskId === c.id)?.message).toMatch(/Moved to the backlog because/);
+    expect(explain(rf.notes.find((n) => n.taskId === c.id)?.message)).toMatch(/Moved to the backlog because/);
   });
 
   it("moves a pinned block that collides with a new commitment", () => {

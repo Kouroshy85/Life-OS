@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { compileGoal } from "../domain/goalCompiler";
 import { planRevision } from "../domain/revision";
 import type { SqlDriver } from "./driver";
-import { currentVersion, LATEST_VERSION, migrate } from "./migrations";
-import { makeTask, Repository } from "./repository";
+import { currentVersion, LATEST_VERSION, migrate, MIGRATIONS } from "./migrations";
+import { makePlan, makeTask, Repository } from "./repository";
 import { createMemoryDriver } from "./sqljsDriver";
 
 let driver: SqlDriver;
@@ -30,6 +30,110 @@ describe("migrations", () => {
   it("enforces constraints at the database level", async () => {
     await expect(repo.createTask(makeTask({ title: "x", priority: 9 as never }))).rejects.toThrow();
     await expect(repo.createTask(makeTask({ title: "x", estimateMin: 0 }))).rejects.toThrow();
+  });
+});
+
+describe("upgrading from version 1", () => {
+  it("turns old commitments into plans and keeps everything else", async () => {
+    const old = await createMemoryDriver();
+    await old.batch(MIGRATIONS[0].statements.map((sql) => ({ sql })));
+    await old.execute("PRAGMA user_version = 1");
+    await old.execute("INSERT INTO commitments (id, title, kind, date, weekdays, start_min, end_min, created_at) VALUES ('w', 'Lunch', 'break', NULL, 62, 750, 795, 'x')");
+    await old.execute("INSERT INTO commitments (id, title, kind, date, weekdays, start_min, end_min, created_at) VALUES ('o', 'Dentist', 'commitment', '2026-11-03', 0, 840, 900, 'x')");
+    await old.execute("INSERT INTO settings (key, value) VALUES ('flag.language', 'fa')");
+    expect(await migrate(old)).toEqual({ from: 1, to: LATEST_VERSION });
+
+    const snap = await new Repository(old).loadSnapshot();
+    expect(snap.flags.language).toBe("fa");
+    expect(snap.plans.find((p) => p.id === "w")).toMatchObject({ type: "default", weekdays: 62, dates: null, isBreak: true });
+    expect(snap.plans.find((p) => p.id === "o")).toMatchObject({ type: "event", dates: ["2026-11-03"], isBreak: false });
+    expect(snap.commitments).toHaveLength(2);
+  });
+});
+
+describe("dreams, music and quotes", () => {
+  it("saves and edits dreams, newest first", async () => {
+    await repo.saveDream({ id: "a", title: "See Japan", body: "Spring", createdAt: "2026-01-01" });
+    await repo.saveDream({ id: "b", title: "Write a book", body: "", createdAt: "2026-02-01" });
+    await repo.saveDream({ id: "a", title: "See Japan", body: "In spring", createdAt: "2026-01-01" });
+    const { dreams } = await repo.loadSnapshot();
+    expect(dreams.map((d) => d.id)).toEqual(["b", "a"]);
+    expect(dreams[1].body).toBe("In spring");
+    await repo.deleteDream("a");
+    expect((await repo.loadSnapshot()).dreams).toHaveLength(1);
+  });
+
+  it("removes a playlist's songs with it", async () => {
+    await repo.savePlaylist({ id: "p", name: "Focus", icon: "moon", createdAt: "x" });
+    await repo.saveSong({ id: "s", playlistId: "p", title: "Rain", artist: "", ext: "mp3", sizeBytes: 10, durationSec: 60.5, sortOrder: 0, createdAt: "x" });
+    let snap = await repo.loadSnapshot();
+    expect(snap.songs[0]).toMatchObject({ title: "Rain", durationSec: 60.5, ext: "mp3" });
+    await repo.deletePlaylist("p");
+    snap = await repo.loadSnapshot();
+    expect(snap.playlists).toHaveLength(0);
+    expect(snap.songs).toHaveLength(0);
+  });
+
+  it("swaps a goal's sessions atomically and leaves other plans alone", async () => {
+    const goalId = await repo.createGoalFromPlan(compileGoal({ text: "Learn Go", targetDate: null, hoursPerWeek: 4, today: "2026-11-02" }));
+    const other = makePlan({ type: "default", title: "Work", weekdays: 2, start: 540, end: 600 });
+    await repo.run([repo.planUpsert(other), repo.planUpsert(makePlan({ type: "goal", title: "Go", goalId, weekdays: 4, start: 600, end: 660 }))]);
+    const next = makePlan({ type: "goal", title: "Go", goalId, weekdays: 8, start: 700, end: 760 });
+    await repo.replaceGoalSessions(goalId, [next]);
+    let plans = (await repo.loadSnapshot()).plans;
+    expect(plans.map((p) => p.id).sort()).toEqual([other.id, next.id].sort());
+
+    // A bad new session rolls back: the old ones must survive.
+    await expect(repo.replaceGoalSessions(goalId, [makePlan({ type: "goal", title: "Go", goalId, weekdays: 8, start: 800, end: 700 })])).rejects.toThrow();
+    plans = (await repo.loadSnapshot()).plans;
+    expect(plans.some((p) => p.id === next.id)).toBe(true);
+  });
+
+  it("clears everything on reset", async () => {
+    await repo.savePlaylist({ id: "p", name: "Focus", icon: "moon", createdAt: "x" });
+    await repo.saveQuote({ id: "q", text: "Breathe", createdAt: "x" });
+    await repo.saveDream({ id: "d", title: "Fly", body: "", createdAt: "x" });
+    await repo.resetAll();
+    const snap = await repo.loadSnapshot();
+    expect([snap.playlists.length, snap.userQuotes.length, snap.dreams.length]).toEqual([0, 0, 0]);
+  });
+});
+
+describe("plans and notes", () => {
+  it("round-trips a plan and edits it in place", async () => {
+    const plan = makePlan({ type: "default", title: "Work", description: "Office", weekdays: 62, validFrom: "2026-11-01", start: 540, end: 1020 });
+    await repo.run([repo.planUpsert(plan)]);
+    await repo.run([repo.planUpsert({ ...plan, title: "Remote work", start: 600 })]);
+    const snap = await repo.loadSnapshot();
+    expect(snap.plans).toHaveLength(1);
+    expect(snap.plans[0]).toMatchObject({ id: plan.id, title: "Remote work", start: 600, description: "Office", validFrom: "2026-11-01" });
+    await repo.deletePlan(plan.id);
+    expect((await repo.loadSnapshot()).plans).toHaveLength(0);
+  });
+
+  it("rejects impossible plans at the database level", async () => {
+    await expect(repo.run([repo.planUpsert(makePlan({ type: "default", title: "X", weekdays: 1, start: 600, end: 500 }))])).rejects.toThrow();
+    await expect(repo.run([repo.planUpsert(makePlan({ type: "default", title: "X", weekdays: 0, start: 500, end: 600 }))])).rejects.toThrow();
+  });
+
+  it("removes a goal's sessions along with the goal", async () => {
+    const goalId = await repo.createGoalFromPlan(compileGoal({ text: "Learn Go", targetDate: null, hoursPerWeek: 4, today: "2026-11-02" }));
+    await repo.run([repo.planUpsert(makePlan({ type: "goal", title: "Learn Go", goalId, weekdays: 2, start: 540, end: 600 }))]);
+    await repo.deleteGoal(goalId);
+    expect((await repo.loadSnapshot()).plans).toHaveLength(0);
+  });
+
+  it("orders notes by urgency and keeps their reminders", async () => {
+    await repo.saveNote({ id: "a", title: "Calm", description: "", urgency: 1, remindAt: null, reminded: false, createdAt: "2026-01-01" });
+    await repo.saveNote({ id: "b", title: "Now", description: "Soon", urgency: 3, remindAt: "2026-11-02T09:30", reminded: false, createdAt: "2026-01-02" });
+    let notes = (await repo.loadSnapshot()).notes;
+    expect(notes.map((n) => n.id)).toEqual(["b", "a"]);
+    expect(notes[0].remindAt).toBe("2026-11-02T09:30");
+    await repo.saveNote({ ...notes[0], reminded: true });
+    notes = (await repo.loadSnapshot()).notes;
+    expect(notes[0].reminded).toBe(true);
+    await repo.deleteNote("a");
+    expect((await repo.loadSnapshot()).notes).toHaveLength(1);
   });
 });
 

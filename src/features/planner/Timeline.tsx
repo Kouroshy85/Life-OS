@@ -1,8 +1,10 @@
 import { Check, Coffee, Lock, Pin, Play } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { subtract, type Interval } from "../../domain/intervals";
+import { num } from "../../domain/locale";
 import { formatClock, formatDuration } from "../../domain/time";
 import type { Commitment, DateKey, Preferences, ScheduleBlock, Task } from "../../domain/types";
+import { t } from "../../i18n";
 import { moveBlock } from "../../state/store";
 
 export const PX_PER_MIN = 1.6;
@@ -62,7 +64,7 @@ export function Timeline(props: TimelineProps) {
       <div className="tl-band tl-band--work" style={{ top: y(prefs.workStart), height: (prefs.workEnd - prefs.workStart) * PX_PER_MIN }} aria-hidden="true" />
       {prefs.focusEnd > prefs.focusStart && (
         <div className="tl-band tl-band--focus" style={{ top: y(prefs.focusStart), height: (prefs.focusEnd - prefs.focusStart) * PX_PER_MIN }} aria-hidden="true">
-          <span>Focus hours</span>
+          <span>{t.focusHoursBand}</span>
         </div>
       )}
 
@@ -74,7 +76,7 @@ export function Timeline(props: TimelineProps) {
 
       {gaps.map((g) => (
         <div key={`g${g.start}`} className="tl-gap" style={{ top: y(g.start) + 3, height: (g.end - g.start) * PX_PER_MIN - 6 }}>
-          <span className="tabular">{formatDuration(g.end - g.start)} free</span>
+          <span className="tabular">{t.freeGap(formatDuration(g.end - g.start))}</span>
         </div>
       ))}
 
@@ -87,7 +89,7 @@ export function Timeline(props: TimelineProps) {
             className={`tl-commit ${c.kind === "break" ? "tl-commit--break" : ""} ${h < 58 ? "tl-item--compact" : ""}`}
             style={{ top: y(c.start), height: Math.max(h, 20) }}
             onClick={() => props.onEditCommitment(c)}
-            title={`${c.title} · ${formatClock(c.start)}–${formatClock(c.end)} · fixed`}
+            title={`${c.title} · ${formatClock(c.start)}–${formatClock(c.end)} · ${t.fixedSuffix}`}
           >
             <span className="tl-item__time tabular">
               {c.kind === "break" ? <Coffee size={11} /> : <Lock size={11} />}
@@ -105,7 +107,7 @@ export function Timeline(props: TimelineProps) {
         ))}
 
       {isToday && nowMin >= rangeStart && nowMin <= rangeEnd && (
-        <div className="tl-now" style={{ top: y(nowMin) }} aria-label={`Now, ${formatClock(nowMin)}`}>
+        <div className="tl-now" style={{ top: y(nowMin) }} aria-label={t.nowAria(formatClock(nowMin))}>
           <span className="tl-now__label tabular">{formatClock(nowMin)}</span>
         </div>
       )}
@@ -173,7 +175,8 @@ function TimelineBlock({
     else void moveBlock(block.id, block.start + step);
   };
 
-  const title = block.kind === "break" ? "Break" : (task?.title ?? "Task");
+  const title = block.kind === "break" ? t.breakLabel : (task?.title ?? t.fallbackTask);
+  const stateWord = { planned: t.statePlanned, in_progress: t.stateInProgress, done: t.stateDone, skipped: t.stateSkipped }[block.state];
   const compact = h < 58;
   const cls = [
     "tl-block",
@@ -191,7 +194,7 @@ function TimelineBlock({
       role="button"
       tabIndex={0}
       aria-pressed={selected}
-      aria-label={`${title}, ${formatClock(previewStart)} to ${formatClock(previewStart + previewDur)}${block.proposed ? ", proposed" : ""}, ${block.state.replace("_", " ")}${movable ? ". Arrow keys move, Alt+arrows resize." : ""}`}
+      aria-label={t.blockAria(title, formatClock(previewStart), formatClock(previewStart + previewDur), block.proposed, stateWord, movable)}
       className={cls}
       style={{ top: y(previewStart), height: Math.max(h, 20) }}
       onPointerDown={onPointerDown("move")}
@@ -213,7 +216,7 @@ function TimelineBlock({
       </span>
       <span className="tl-item__title">
         {title}
-        {block.partCount > 1 && <span className="tl-item__part"> · {block.part}/{block.partCount}</span>}
+        {block.partCount > 1 && <span className="tl-item__part"> · {num(`${block.part}/${block.partCount}`)}</span>}
       </span>
       {diff && <span className="tl-block__diff">{diff}</span>}
       {movable && <span className="tl-block__resize" onPointerDown={onPointerDown("resize")} aria-hidden="true" />}

@@ -22,9 +22,12 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { subtract, totalLength } from "../../domain/intervals";
+import { getLang, num } from "../../domain/locale";
 import { rankTasks } from "../../domain/scheduler";
 import { addDays, formatClock, formatDuration, formatLongDate, relativeDay } from "../../domain/time";
-import type { Commitment, ScheduleBlock, Task, UnscheduledNote } from "../../domain/types";
+import type { Commitment, Plan, PlanType, ScheduleBlock, Task, UnscheduledNote } from "../../domain/types";
+import { explain, t } from "../../i18n";
+import { DateInput } from "../../ui/fields";
 import { commitmentsOn, isKept, isOpen, liveBlocks, proposedBlocks, toSchedulable, unplannedMinutes } from "../../state/planning";
 import {
   acceptProposal,
@@ -47,7 +50,8 @@ import { LiquidGlass } from "../../ui/LiquidGlass";
 import { Button, Empty, IconButton } from "../../ui/primitives";
 import { TaskMeta } from "../../ui/taskBits";
 import { TaskDialog, type TaskDraft } from "../goals/TaskDialog";
-import { CommitmentDialog } from "./CommitmentDialog";
+import { PlanWizard } from "./PlanWizard";
+import { PlannerSwitch } from "./PlansView";
 import { PrefsDialog } from "./PrefsForm";
 import { Timeline } from "./Timeline";
 
@@ -65,7 +69,12 @@ export function PlannerView() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [taskDialog, setTaskDialog] = useState<{ task: Task | null; draft?: TaskDraft } | null>(null);
-  const [commitDialog, setCommitDialog] = useState<{ c: Commitment | null } | null>(null);
+  const plans = useApp((s) => s.plans);
+  const [planWizard, setPlanWizard] = useState<{ type: PlanType; plan?: Plan } | null>(null);
+  const setCommitDialog = ({ c }: { c: Commitment | null }) => {
+    const plan = c ? plans.find((p) => p.id === c.id) : undefined;
+    setPlanWizard(plan ? { type: plan.type, plan } : { type: "event" });
+  };
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -86,7 +95,7 @@ export function PlannerView() {
     for (const p of proposal) {
       if (p.kind !== "task") continue;
       const prev = live.find((b) => b.taskId === p.taskId && b.state === "planned" && b.part === p.part);
-      map.set(p.id, !prev ? "New" : prev.start === p.start ? "Unchanged" : `Was ${formatClock(prev.start)}`);
+      map.set(p.id, !prev ? t.diffNew : prev.start === p.start ? t.diffSame : t.diffWas(formatClock(prev.start)));
     }
     return map;
   }, [hasProposal, proposal, live]);
@@ -119,8 +128,11 @@ export function PlannerView() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey || document.querySelector(".overlay")) return;
-      if (e.key === "ArrowLeft" && !(e.target as HTMLElement).closest(".tl-block, .segmented")) setPlannerDate(addDays(date, -1));
-      else if (e.key === "ArrowRight" && !(e.target as HTMLElement).closest(".tl-block, .segmented")) setPlannerDate(addDays(date, 1));
+      // Right-to-left, earlier days are to the right.
+      const earlier = getLang() === "fa" ? "ArrowRight" : "ArrowLeft";
+      const later = getLang() === "fa" ? "ArrowLeft" : "ArrowRight";
+      if (e.key === earlier && !(e.target as HTMLElement).closest(".tl-block, .segmented")) setPlannerDate(addDays(date, -1));
+      else if (e.key === later && !(e.target as HTMLElement).closest(".tl-block, .segmented")) setPlannerDate(addDays(date, 1));
       else if (e.key.toLowerCase() === "t") setPlannerDate(clock.today);
       else if (e.key.toLowerCase() === "p" && !isPast) void proposeDay(date);
       else if (e.key === "Escape") setSelectedId(null);
@@ -146,59 +158,62 @@ export function PlannerView() {
     <div className="page page--planner">
       <div className="page-head">
         <div>
-          <div className="eyebrow">Adaptive Day Planner · {relativeDay(date, clock.today)}</div>
+          <div className="eyebrow">{t.plannerEyebrow(relativeDay(date, clock.today))}</div>
           <h1 className="page-title" tabIndex={-1} data-page-heading>
             {formatLongDate(date)}
           </h1>
           <p className="page-sub tabular">
             {isPast
-              ? "This day has passed — its plan is kept as a record."
-              : `${formatDuration(workMin)} working · ${formatDuration(commitmentMin)} committed · ${formatDuration(scheduledMin)} scheduled · ${formatDuration(freeLeft)} free${isToday ? " from now" : ""}`}
+              ? t.pastDay
+              : t.daySummary(formatDuration(workMin), formatDuration(commitmentMin), formatDuration(scheduledMin), formatDuration(freeLeft), isToday)}
           </p>
         </div>
+        <PlannerSwitch mode="day" />
       </div>
 
       <LiquidGlass className="toolbar" radius={22} bezel={14} strength={30}>
         <div className="toolbar__group">
-          <IconButton label="Previous day (←)" onClick={() => setPlannerDate(addDays(date, -1))}>
-            <ChevronLeft size={18} />
+          <IconButton label={t.prevDay} onClick={() => setPlannerDate(addDays(date, -1))}>
+            <ChevronLeft size={18} className="flip-rtl" />
           </IconButton>
-          <Button size="sm" variant={isToday ? "glass" : "ghost"} onClick={() => setPlannerDate(clock.today)} title="Today (T)">
-            Today
+          <Button size="sm" variant={isToday ? "glass" : "ghost"} onClick={() => setPlannerDate(clock.today)} title={t.todayTitle}>
+            {t.todayShort}
           </Button>
-          <IconButton label="Next day (→)" onClick={() => setPlannerDate(addDays(date, 1))}>
-            <ChevronRight size={18} />
+          <IconButton label={t.nextDay} onClick={() => setPlannerDate(addDays(date, 1))}>
+            <ChevronRight size={18} className="flip-rtl" />
           </IconButton>
-          <input type="date" className="input input--bare toolbar__date tabular" aria-label="Go to date" value={date} onChange={(e) => e.target.value && setPlannerDate(e.target.value)} />
+          <span className="toolbar__date">
+            <DateInput bare required aria-label={t.goToDate} value={date} onChange={(v) => v && setPlannerDate(v)} />
+          </span>
         </div>
         <div className="toolbar__group">
           <Button size="sm" variant="ghost" icon={<Plus size={15} />} onClick={() => setTaskDialog({ task: null, draft: { inPlanner: true } })}>
-            Task
+            {t.task}
           </Button>
           <Button size="sm" variant="ghost" icon={<Lock size={14} />} onClick={() => setCommitDialog({ c: null })}>
-            Commitment
+            {t.commitment}
           </Button>
-          <IconButton label="Planning preferences" onClick={() => setPrefsOpen(true)}>
+          <IconButton label={t.planningPrefs} onClick={() => setPrefsOpen(true)}>
             <SlidersHorizontal size={16} />
           </IconButton>
           {hasProposal ? (
             <>
               <Button size="sm" variant="ghost" icon={<X size={15} />} disabled={busy} onClick={() => run(() => rejectProposal(date))}>
-                Reject
+                {t.reject}
               </Button>
               <Button size="sm" variant="primary" icon={<Check size={15} />} disabled={busy} onClick={() => run(() => acceptProposal(date))}>
-                Accept plan
+                {t.acceptPlan}
               </Button>
             </>
           ) : (
             <>
               {remainingPlanned && !isPast && (
-                <Button size="sm" variant="glass" icon={<RefreshCcw size={14} />} disabled={busy} onClick={() => run(() => reflowNow(date))} title="Re-flow the rest of the day around what has happened">
-                  Recalculate rest
+                <Button size="sm" variant="glass" icon={<RefreshCcw size={14} />} disabled={busy} onClick={() => run(() => reflowNow(date))} title={t.recalcRestTitle}>
+                  {t.recalcRest}
                 </Button>
               )}
-              <Button size="sm" variant="primary" icon={<Sparkles size={15} />} disabled={busy || isPast} onClick={() => run(() => proposeDay(date))} title={isPast ? "This day has passed" : "Propose a schedule (P)"}>
-                {live.some((b) => b.kind === "task") ? "Re-plan day" : "Plan day"}
+              <Button size="sm" variant="primary" icon={<Sparkles size={15} />} disabled={busy || isPast} onClick={() => run(() => proposeDay(date))} title={isPast ? t.dayPassedTitle : t.planDayTitle}>
+                {live.some((b) => b.kind === "task") ? t.replanDay : t.planDay}
               </Button>
             </>
           )}
@@ -209,8 +224,8 @@ export function PlannerView() {
         <div className="proposal-banner rise" role="status">
           <Sparkles size={16} />
           <div style={{ flex: 1 }}>
-            <strong>Proposed schedule</strong>
-            <span className="muted"> — {dayPlan?.proposalSummary || "nothing could be placed"}. Review the dashed blocks, then accept or reject. Started and pinned blocks stay as they are.</span>
+            <strong>{t.proposedSchedule}</strong>
+            <span className="muted">{t.proposalBanner(explain(dayPlan?.proposalSummary))}</span>
           </div>
         </div>
       )}
@@ -222,8 +237,8 @@ export function PlannerView() {
               <CalendarClock size={16} />
               <span>
                 {backlog.length
-                  ? `${backlog.length} task${backlog.length === 1 ? "" : "s"} waiting in the backlog — press Plan day to schedule them.`
-                  : "Add tasks to the backlog or send tasks from a goal, then plan the day."}
+                  ? t.hintBacklogWaiting(backlog.length)
+                  : t.hintEmpty}
               </span>
             </div>
           )}
@@ -251,35 +266,35 @@ export function PlannerView() {
           <section className="card side-card" aria-labelledby="backlog-title">
             <div className="card__title">
               <span id="backlog-title">
-                Backlog <span className="faint tabular">{backlog.length}</span>
+                {t.backlog} <span className="faint tabular">{num(backlog.length)}</span>
               </span>
               <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={() => setTaskDialog({ task: null, draft: { inPlanner: true } })}>
-                Add
+                {t.add}
               </Button>
             </div>
             {backlog.length === 0 ? (
-              <Empty icon={<ListPlus size={20} />} title="Backlog is clear" text="Tasks you add here, or send from a goal, wait in the backlog until they're scheduled." />
+              <Empty icon={<ListPlus size={20} />} title={t.backlogClear} text={t.backlogClearText} />
             ) : (
               <ul className="backlog">
-                {backlog.map((t) => {
-                  const note = notes.get(t.id);
+                {backlog.map((item) => {
+                  const note = notes.get(item.id);
                   return (
-                    <li key={t.id} className="backlog__item">
-                      <button type="button" className="backlog__main" onClick={() => setTaskDialog({ task: t })}>
-                        <span className="backlog__title">{t.title}</span>
+                    <li key={item.id} className="backlog__item">
+                      <button type="button" className="backlog__main" onClick={() => setTaskDialog({ task: item })}>
+                        <span className="backlog__title">{item.title}</span>
                         <span className="taskrow__meta">
-                          <TaskMeta task={t} today={clock.today} />
-                          {skippedToday.has(t.id) && <span className="chip">Skipped {isToday ? "today" : "this day"}</span>}
+                          <TaskMeta task={item} today={clock.today} />
+                          {skippedToday.has(item.id) && <span className="chip">{t.skippedDay(isToday)}</span>}
                         </span>
-                        {note && <span className={`backlog__why backlog__why--${note.reason}`}>{note.message}</span>}
+                        {note && <span className={`backlog__why backlog__why--${note.reason}`}>{explain(note.message)}</span>}
                       </button>
                       <div className="backlog__actions">
                         {!isPast && (
-                          <IconButton label={`Schedule “${t.title}” in the next free slot`} onClick={() => scheduleTask(t.id, date)}>
+                          <IconButton label={t.scheduleInSlot(item.title)} onClick={() => scheduleTask(item.id, date)}>
                             <CalendarClock size={16} />
                           </IconButton>
                         )}
-                        <IconButton label="Remove from planner" onClick={() => sendToPlanner([t.id], false)}>
+                        <IconButton label={t.removeFromPlanner} onClick={() => sendToPlanner([item.id], false)}>
                           <X size={15} />
                         </IconButton>
                       </div>
@@ -292,14 +307,14 @@ export function PlannerView() {
 
           <section className="card side-card" aria-labelledby="commit-title">
             <div className="card__title">
-              <span id="commit-title">Fixed commitments</span>
+              <span id="commit-title">{t.fixedCommitments}</span>
               <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={() => setCommitDialog({ c: null })}>
-                Add
+                {t.add}
               </Button>
             </div>
             {commitments.length === 0 ? (
               <p className="faint" style={{ fontSize: 13 }}>
-                Nothing fixed on this day. Add classes, meetings or breaks so the planner works around them.
+                {t.noCommitments}
               </p>
             ) : (
               <ul className="commit-list">
@@ -311,7 +326,7 @@ export function PlannerView() {
                         {formatClock(c.start)}–{formatClock(c.end)}
                       </span>
                       <span style={{ flex: 1 }}>{c.title}</span>
-                      {!c.date && <span className="chip">Weekly</span>}
+                      {!c.date && <span className="chip">{t.weekly}</span>}
                     </button>
                   </li>
                 ))}
@@ -324,7 +339,7 @@ export function PlannerView() {
       </div>
 
       <TaskDialog open={!!taskDialog} task={taskDialog?.task} draft={taskDialog?.draft} onClose={() => setTaskDialog(null)} />
-      <CommitmentDialog open={!!commitDialog} commitment={commitDialog?.c ?? null} date={date} onClose={() => setCommitDialog(null)} />
+      <PlanWizard open={!!planWizard} type={planWizard?.type ?? "event"} plan={planWizard?.plan} date={date} onClose={() => setPlanWizard(null)} />
       <PrefsDialog open={prefsOpen} onClose={() => setPrefsOpen(false)} />
     </div>
   );
@@ -334,14 +349,14 @@ function SkippedList({ blocks, tasks }: { blocks: ScheduleBlock[]; tasks: Map<st
   if (!blocks.length) return null;
   return (
     <section className="card side-card">
-      <div className="card__title">Skipped</div>
+      <div className="card__title">{t.skipped}</div>
       <ul className="commit-list">
         {blocks.map((b) => (
           <li key={b.id} className="commit-list__item" style={{ cursor: "default" }}>
             <CircleSlash size={14} />
-            <span style={{ flex: 1 }}>{tasks.get(b.taskId ?? "")?.title ?? "Task"}</span>
+            <span style={{ flex: 1 }}>{tasks.get(b.taskId ?? "")?.title ?? t.fallbackTask}</span>
             <Button size="sm" variant="ghost" icon={<Undo2 size={13} />} onClick={() => reopenBlock(b.id)}>
-              Restore
+              {t.restore}
             </Button>
           </li>
         ))}
@@ -352,27 +367,27 @@ function SkippedList({ blocks, tasks }: { blocks: ScheduleBlock[]; tasks: Map<st
 
 function BlockDetail({ block, task, isPast, onClose, onEditTask }: { block: ScheduleBlock; task?: Task; isPast: boolean; onClose: () => void; onEditTask: (t: Task) => void }) {
   const dur = block.end - block.start;
-  const title = block.kind === "break" ? "Break" : (task?.title ?? "Task");
-  const stateLabel = { planned: block.proposed ? "Proposed" : "Planned", in_progress: "In progress", done: "Completed", skipped: "Skipped" }[block.state];
+  const title = block.kind === "break" ? t.breakLabel : (task?.title ?? t.fallbackTask);
+  const stateLabel = { planned: block.proposed ? t.stateProposed : t.statePlanned, in_progress: t.stateInProgress, done: t.stateDone, skipped: t.stateSkipped }[block.state];
   return (
-    <LiquidGlass dense radius={22} bezel={14} strength={22} className="block-detail rise" aria-label="Selected block">
+    <LiquidGlass dense radius={22} bezel={14} strength={22} className="block-detail rise" aria-label={t.selectedBlock}>
       <div className="block-detail__head">
         <div>
-          <div className="eyebrow">{stateLabel}{block.pinned && !block.proposed ? " · pinned" : ""}</div>
+          <div className="eyebrow">{stateLabel}{block.pinned && !block.proposed ? t.pinnedSuffix : ""}</div>
           <h2 className="block-detail__title">{title}</h2>
           <div className="faint tabular" style={{ fontSize: 13, marginTop: 2 }}>
             <Clock3 size={12} style={{ verticalAlign: -1 }} /> {formatClock(block.start)}–{formatClock(block.end)} · {formatDuration(dur)}
-            {block.partCount > 1 && ` · session ${block.part} of ${block.partCount}`}
+            {block.partCount > 1 && t.sessionOf(num(block.part), num(block.partCount))}
           </div>
         </div>
-        <IconButton label="Close details" onClick={onClose}>
+        <IconButton label={t.closeDetails} onClick={onClose}>
           <X size={16} />
         </IconButton>
       </div>
 
       <div className="block-detail__why">
-        <div className="eyebrow" style={{ marginBottom: 6 }}>Why it's here</div>
-        <p>{block.reason || "Placed manually."}</p>
+        <div className="eyebrow" style={{ marginBottom: 6 }}>{t.whyHere}</div>
+        <p>{explain(block.reason) || t.placedManually}</p>
       </div>
 
       {task && block.kind === "task" && !block.proposed && !isPast && (
@@ -380,56 +395,56 @@ function BlockDetail({ block, task, isPast, onClose, onEditTask }: { block: Sche
           {block.state === "planned" && (
             <>
               <Button size="sm" variant="primary" icon={<Play size={13} />} onClick={() => startBlock(block.id)}>
-                Start
+                {t.start}
               </Button>
               <Button size="sm" variant="glass" icon={<Check size={14} />} onClick={() => completeBlock(block.id)}>
-                Done
+                {t.done}
               </Button>
               <Button size="sm" variant="ghost" icon={<CircleSlash size={14} />} onClick={() => skipBlock(block.id)}>
-                Skip
+                {t.skip}
               </Button>
-              <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={() => unscheduleBlock(block.id)} title="Return the task to the backlog">
-                Unschedule
+              <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={() => unscheduleBlock(block.id)} title={t.unscheduleTitle}>
+                {t.unschedule}
               </Button>
             </>
           )}
           {block.state === "in_progress" && (
             <>
               <Button size="sm" variant="primary" icon={<Check size={14} />} onClick={() => completeBlock(block.id)}>
-                {block.partCount > 1 || task.estimateMin - task.progressMin > dur ? "Session done" : "Done"}
+                {block.partCount > 1 || task.estimateMin - task.progressMin > dur ? t.sessionDone : t.done}
               </Button>
-              <Button size="sm" variant="glass" icon={<Timer size={14} />} onClick={() => extendBlock(block.id, 15)} title="Running long — extend and recalculate the rest of the day">
-                +15m
+              <Button size="sm" variant="glass" icon={<Timer size={14} />} onClick={() => extendBlock(block.id, 15)} title={t.extendTitle}>
+                +{formatDuration(15)}
               </Button>
               <Button size="sm" variant="glass" onClick={() => extendBlock(block.id, 30)}>
-                +30m
+                +{formatDuration(30)}
               </Button>
               <Button size="sm" variant="ghost" icon={<Pause size={13} />} onClick={() => reopenBlock(block.id)}>
-                Pause
+                {t.pause}
               </Button>
               <Button size="sm" variant="ghost" icon={<CircleSlash size={14} />} onClick={() => skipBlock(block.id)}>
-                Skip
+                {t.skip}
               </Button>
             </>
           )}
           {block.state === "done" && (
             <Button size="sm" variant="ghost" icon={<RotateCcw size={14} />} onClick={() => reopenBlock(block.id)}>
-              Mark not done
+              {t.markNotDone}
             </Button>
           )}
           {(block.partCount > 1 || task.estimateMin - task.progressMin > dur) && block.state !== "done" && (
             <Button size="sm" variant="ghost" icon={<Check size={14} />} onClick={() => completeTaskFromBlock(block.id)}>
-              Finish whole task
+              {t.finishWhole}
             </Button>
           )}
           <Button size="sm" variant="ghost" icon={<Pencil size={13} />} onClick={() => onEditTask(task)}>
-            Edit task
+            {t.editTask}
           </Button>
         </div>
       )}
       {block.kind === "task" && !isPast && block.state === "planned" && (
         <p className="faint" style={{ fontSize: 12 }}>
-          {block.proposed ? "Adjust this proposal before accepting. " : ""}Drag the block to move it, or its bottom edge to resize. With it focused, use ↑/↓ (Shift for 15 min, Alt to resize). Overlaps are never allowed.
+          {block.proposed ? t.adjustProposal : ""}{t.dragHint}
         </p>
       )}
     </LiquidGlass>

@@ -2,12 +2,14 @@ import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { ArrowDown, ArrowUp, CalendarDays, FolderPlus, ListPlus, MoreHorizontal, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { num, pct } from "../../domain/locale";
 import { formatDuration, formatShortDate } from "../../domain/time";
+import { t } from "../../i18n";
+import { DateInput } from "../../ui/fields";
 import type { Goal, Milestone, Project, ScheduleBlock, Task } from "../../domain/types";
 import {
   addMilestone,
   addProject,
-  deleteGoal,
   deleteMilestone,
   deleteProject,
   goalProgress,
@@ -21,6 +23,7 @@ import {
 import { InlineText } from "../../ui/InlineText";
 import { Bar, Button, Confirm, IconButton, Menu, ProgressRing } from "../../ui/primitives";
 import { SourceBadge } from "./GoalComposer";
+import { AbandonGoalDialog } from "./AbandonGoalDialog";
 import { ReviseDialog } from "./ReviseDialog";
 import { TaskDialog, type TaskDraft } from "./TaskDialog";
 import { TaskRow } from "./TaskRow";
@@ -59,60 +62,55 @@ export function GoalDetail({ goal }: { goal: Goal }) {
         <div className="goal-hero__text">
           <div className="goal-hero__badges">
             <SourceBadge source={goal.source} model={goal.sourceModel} />
-            {goal.isSample && <span className="badge-sample">Sample</span>}
-            {goal.revision > 1 && <span className="faint" style={{ fontSize: 12 }}>Revision {goal.revision}</span>}
+            {goal.isSample && <span className="badge-sample">{t.sample}</span>}
+            {goal.revision > 1 && <span className="faint" style={{ fontSize: 12 }}>{t.revisionN(num(goal.revision))}</span>}
           </div>
-          <InlineText className="goal-hero__title" label="Goal title" multiline value={goal.title} onSave={(v) => updateGoal(goal.id, { title: v })} maxLength={160} />
+          <InlineText className="goal-hero__title" label={t.goalTitleLabel} multiline value={goal.title} onSave={(v) => updateGoal(goal.id, { title: v })} maxLength={160} />
           <InlineText
             className="goal-hero__desc"
-            label="Goal description"
+            label={t.goalDescLabel}
             value={goal.description}
-            placeholder="Add a description…"
+            placeholder={t.addDescription}
             allowEmpty
             multiline
             maxLength={600}
             onSave={(v) => updateGoal(goal.id, { description: v })}
           />
           <div className="goal-hero__meta">
-            <label className="goal-hero__date">
+            <span className="goal-hero__date">
               <CalendarDays size={14} />
-              <span className="faint">Target</span>
-              <input
-                type="date"
-                className="input input--bare tabular"
-                aria-label="Target date"
-                value={goal.targetDate ?? ""}
-                onChange={(e) => updateGoal(goal.id, { targetDate: e.target.value || null })}
-              />
-            </label>
+              <span className="faint">{t.target}</span>
+              <DateInput bare aria-label={t.targetDate} value={goal.targetDate} onChange={(v) => updateGoal(goal.id, { targetDate: v })} />
+            </span>
             <span className="faint tabular">
-              {progress.done}/{progress.total} tasks · {formatDuration(progress.doneMin)} of {formatDuration(progress.totalMin)}
+              {t.tasksCount(num(progress.done), num(progress.total))} · {t.ofDuration(formatDuration(progress.doneMin), formatDuration(progress.totalMin))}
             </span>
           </div>
           <div className="goal-hero__actions">
             <Button variant="glass" size="sm" icon={<RefreshCcw size={14} />} onClick={() => setRevising(true)}>
-              Revise plan
+              {t.revisePlan}
             </Button>
-            <Button variant="glass" size="sm" icon={<ListPlus size={14} />} disabled={!openIds.length} onClick={() => sendToPlanner(openIds)} title="Make all open tasks available to the day planner">
-              Send open tasks to planner
+            <Button variant="glass" size="sm" icon={<ListPlus size={14} />} disabled={!openIds.length} onClick={() => sendToPlanner(openIds)} title={t.sendOpenTitle}>
+              {t.sendOpen}
+            </Button>
+            <Button variant="danger-ghost" size="sm" icon={<Trash2 size={14} />} onClick={() => setConfirmDelete(true)}>
+              {t.deleteGoal}
             </Button>
             <Menu
-              label="Goal actions"
+              label={t.goalActions}
               trigger={(p) => (
-                <IconButton label="More goal actions" {...p}>
+                <IconButton label={t.moreGoalActions} {...p}>
                   <MoreHorizontal size={17} />
                 </IconButton>
               )}
               items={[
-                { label: "Add milestone", icon: <Plus size={15} />, onSelect: () => addMilestone(goal.id, "New milestone") },
-                "separator",
-                { label: "Delete goal", icon: <Trash2 size={15} />, danger: true, onSelect: () => setConfirmDelete(true) },
+                { label: t.addMilestone, icon: <Plus size={15} />, onSelect: () => addMilestone(goal.id, t.newMilestone) },
               ]}
             />
           </div>
         </div>
         <div className="goal-hero__side">
-          <ProgressRing value={progress.ratio} size={104} stroke={9} label={`${Math.round(progress.ratio * 100)}%`} />
+          <ProgressRing value={progress.ratio} size={104} stroke={9} label={pct(Math.round(progress.ratio * 100))} />
         </div>
       </header>
 
@@ -135,28 +133,21 @@ export function GoalDetail({ goal }: { goal: Goal }) {
             onEditTask={(task, draft) => setEditing({ task, draft })}
           />
         ))}
-        <button type="button" className="outline__add" onClick={() => addMilestone(goal.id, "New milestone")}>
-          <Plus size={15} /> Add milestone
+        <button type="button" className="outline__add" onClick={() => addMilestone(goal.id, t.newMilestone)}>
+          <Plus size={15} /> {t.addMilestone}
         </button>
       </div>
 
       <TaskDialog open={!!editing} task={editing?.task} draft={editing?.draft} onClose={() => setEditing(null)} />
       <ReviseDialog goal={goal} open={revising} onClose={() => setRevising(false)} />
-      <Confirm
-        open={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
-        title="Delete this goal?"
-        message={`“${goal.title}” and all ${tasks.length} of its tasks will be deleted, including any scheduled sessions. This can't be undone.`}
-        confirmLabel="Delete goal"
-        onConfirm={() => deleteGoal(goal.id)}
-      />
+      <AbandonGoalDialog goal={goal} open={confirmDelete} onClose={() => setConfirmDelete(false)} />
     </div>
   );
 }
 
 function MilestonePath({ milestones, tasks }: { milestones: Milestone[]; tasks: Task[] }) {
   return (
-    <nav className="mpath" aria-label="Milestones">
+    <nav className="mpath" aria-label={t.milestonesNav}>
       {milestones.map((m, i) => {
         const list = tasks.filter((t) => t.milestoneId === m.id && t.status !== "skipped");
         const done = list.filter((t) => t.status === "done").length;
@@ -168,11 +159,11 @@ function MilestonePath({ milestones, tasks }: { milestones: Milestone[]; tasks: 
             document.getElementById(`ms-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
           }}>
             <span className="mpath__dot" style={{ ["--p" as string]: `${ratio * 360}deg` }}>
-              <span>{i + 1}</span>
+              <span>{num(i + 1)}</span>
             </span>
             <span className="mpath__title">{m.title}</span>
             <span className="mpath__sub tabular">
-              {done}/{list.length}
+              {num(`${done}/${list.length}`)}
               {m.deadline ? ` · ${formatShortDate(m.deadline)}` : ""}
             </span>
           </a>
@@ -211,14 +202,14 @@ function MilestoneSection({
   return (
     <section className="milestone" id={`ms-${milestone.id}`} aria-labelledby={`ms-title-${milestone.id}`}>
       <div className="milestone__head">
-        <span className="milestone__num">{index + 1}</span>
+        <span className="milestone__num">{num(index + 1)}</span>
         <div className="milestone__titles">
-          <InlineText className="milestone__title" label="Milestone title" multiline value={milestone.title} onSave={(v) => updateMilestone(milestone.id, { title: v })} />
+          <InlineText className="milestone__title" label={t.milestoneTitle} multiline value={milestone.title} onSave={(v) => updateMilestone(milestone.id, { title: v })} />
           <InlineText
             className="milestone__desc"
-            label="Milestone description"
+            label={t.milestoneDesc}
             value={milestone.description}
-            placeholder="Add a description…"
+            placeholder={t.addDescription}
             allowEmpty
             multiline
             onSave={(v) => updateMilestone(milestone.id, { description: v })}
@@ -226,38 +217,32 @@ function MilestoneSection({
           />
         </div>
         <div className="milestone__side">
-          <label className="milestone__deadline" title="Milestone deadline">
+          <span className="milestone__deadline" title={t.milestoneDeadline}>
             <CalendarDays size={13} />
-            <input
-              type="date"
-              className="input input--bare tabular"
-              aria-label="Milestone deadline"
-              value={milestone.deadline ?? ""}
-              onChange={(e) => updateMilestone(milestone.id, { deadline: e.target.value || null })}
-            />
-          </label>
+            <DateInput bare aria-label={t.milestoneDeadline} value={milestone.deadline} onChange={(v) => updateMilestone(milestone.id, { deadline: v })} />
+          </span>
           <div className="milestone__progress">
             <span className="faint tabular" style={{ fontSize: 12 }} id={`ms-title-${milestone.id}`}>
-              {done}/{counted.length}
+              {num(`${done}/${counted.length}`)}
             </span>
             <div style={{ width: 72 }}>
               <Bar value={counted.length ? done / counted.length : 0} />
             </div>
           </div>
           <Menu
-            label={`Actions for milestone ${milestone.title}`}
+            label={t.actionsForMilestone(milestone.title)}
             trigger={(p) => (
-              <IconButton label="Milestone actions" {...p}>
+              <IconButton label={t.milestoneActions} {...p}>
                 <MoreHorizontal size={16} />
               </IconButton>
             )}
             items={[
-              { label: "Add project", icon: <FolderPlus size={15} />, onSelect: () => addProject(milestone.id, "New project") },
-              { label: "Send open tasks to planner", icon: <ListPlus size={15} />, disabled: !openIds.length, onSelect: () => sendToPlanner(openIds) },
-              { label: "Move up", icon: <ArrowUp size={15} />, disabled: index === 0, onSelect: () => onMove(-1) },
-              { label: "Move down", icon: <ArrowDown size={15} />, disabled: index === count - 1, onSelect: () => onMove(1) },
+              { label: t.addProject, icon: <FolderPlus size={15} />, onSelect: () => addProject(milestone.id, t.newProject) },
+              { label: t.sendOpen, icon: <ListPlus size={15} />, disabled: !openIds.length, onSelect: () => sendToPlanner(openIds) },
+              { label: t.moveUp, icon: <ArrowUp size={15} />, disabled: index === 0, onSelect: () => onMove(-1) },
+              { label: t.moveDown, icon: <ArrowDown size={15} />, disabled: index === count - 1, onSelect: () => onMove(1) },
               "separator",
-              { label: "Delete milestone", icon: <Trash2 size={15} />, danger: true, onSelect: () => setConfirm(true) },
+              { label: t.deleteMilestone, icon: <Trash2 size={15} />, danger: true, onSelect: () => setConfirm(true) },
             ]}
           />
         </div>
@@ -286,16 +271,16 @@ function MilestoneSection({
           />
         )}
         {projects.length === 0 && orphanTasks.length === 0 && (
-          <button type="button" className="outline__add outline__add--inline" onClick={() => addProject(milestone.id, "Tasks")}>
-            <FolderPlus size={14} /> Add a project to start adding tasks
+          <button type="button" className="outline__add outline__add--inline" onClick={() => addProject(milestone.id, t.defaultProject)}>
+            <FolderPlus size={14} /> {t.addProjectFirst}
           </button>
         )}
       </div>
       <Confirm
         open={confirm}
         onClose={() => setConfirm(false)}
-        title="Delete milestone?"
-        message={`“${milestone.title}” and its ${mTasks.length} task${mTasks.length === 1 ? "" : "s"} will be deleted.`}
+        title={t.deleteMilestoneQ}
+        message={t.deleteMilestoneMsg(milestone.title, mTasks.length)}
         onConfirm={() => deleteMilestone(milestone.id)}
       />
     </section>
@@ -332,15 +317,15 @@ function ProjectBlock({
     <div className="project">
       {project && (
         <div className={`project__head ${single ? "project__head--quiet" : ""}`}>
-          <InlineText className="project__title" label="Project title" value={project.title} onSave={(v) => renameProject(project.id, v)} maxLength={120} />
+          <InlineText className="project__title" label={t.projectTitle} value={project.title} onSave={(v) => renameProject(project.id, v)} maxLength={120} />
           <Menu
-            label={`Actions for project ${project.title}`}
+            label={t.actionsForProject(project.title)}
             trigger={(p) => (
-              <IconButton label="Project actions" {...p}>
+              <IconButton label={t.projectActions} {...p}>
                 <MoreHorizontal size={15} />
               </IconButton>
             )}
-            items={[{ label: "Delete project and its tasks", icon: <Trash2 size={15} />, danger: true, onSelect: () => deleteProject(project.id) }]}
+            items={[{ label: t.deleteProject, icon: <Trash2 size={15} />, danger: true, onSelect: () => deleteProject(project.id) }]}
           />
         </div>
       )}
@@ -354,7 +339,7 @@ function ProjectBlock({
         </SortableContext>
       </DndContext>
       <button type="button" className="outline__add outline__add--inline" onClick={() => onEditTask(null, draft)}>
-        <Plus size={14} /> Add task
+        <Plus size={14} /> {t.taskAdd}
       </button>
     </div>
   );

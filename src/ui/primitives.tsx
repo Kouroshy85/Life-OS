@@ -12,6 +12,8 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { getLang } from "../domain/locale";
+import { t } from "../i18n";
 import { dismissToast, useApp } from "../state/store";
 import { LiquidGlass } from "./LiquidGlass";
 
@@ -59,6 +61,7 @@ export function Dialog({
   children,
   footer,
   wide,
+  huge,
   initialFocus,
 }: {
   open: boolean;
@@ -68,6 +71,7 @@ export function Dialog({
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  huge?: boolean;
   initialFocus?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -88,6 +92,8 @@ export function Dialog({
     }, 30);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // A menu or calendar open on top of this dialog closes first.
+        if (document.querySelector(".menu, .datepicker")) return;
         e.stopPropagation();
         onClose();
       }
@@ -121,7 +127,7 @@ export function Dialog({
         dense
         radius={26}
         strength={22}
-        className={`dialog ${wide ? "dialog--wide" : ""}`}
+        className={`dialog ${wide ? "dialog--wide" : ""} ${huge ? "dialog--huge" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -133,7 +139,7 @@ export function Dialog({
             </h2>
             {subtitle && <p className="dialog__sub">{subtitle}</p>}
           </div>
-          <IconButton label="Close" onClick={onClose}>
+          <IconButton label={t.close} onClick={onClose}>
             <X size={18} />
           </IconButton>
         </div>
@@ -151,7 +157,7 @@ export function Confirm({
   open,
   title,
   message,
-  confirmLabel = "Delete",
+  confirmLabel = t.delete,
   onConfirm,
   onClose,
 }: {
@@ -171,7 +177,7 @@ export function Confirm({
       footer={
         <>
           <Button variant="ghost" onClick={onClose} data-cancel>
-            Cancel
+            {t.cancel}
           </Button>
           <Button
             variant="danger"
@@ -198,6 +204,8 @@ export interface MenuItem {
   onSelect: () => void;
   danger?: boolean;
   disabled?: boolean;
+  /** Shown as chosen, for menus that pick one option. */
+  checked?: boolean;
 }
 
 export function Menu({ trigger, items, label, align = "end" }: { trigger: (props: { onClick: (e: React.MouseEvent) => void; "aria-expanded": boolean; "aria-haspopup": "menu" }) => ReactNode; items: (MenuItem | "separator")[]; label: string; align?: "start" | "end" }) {
@@ -209,12 +217,13 @@ export function Menu({ trigger, items, label, align = "end" }: { trigger: (props
   useLayoutEffect(() => {
     if (!anchor || !menuRef.current) return;
     const m = menuRef.current.getBoundingClientRect();
-    let left = align === "end" ? anchor.right - m.width : anchor.left;
+    const atRight = (align === "end") !== (getLang() === "fa");
+    let left = atRight ? anchor.right - m.width : anchor.left;
     left = Math.max(8, Math.min(window.innerWidth - m.width - 8, left));
     let top = anchor.bottom + 6;
     if (top + m.height > window.innerHeight - 8) top = anchor.top - m.height - 6;
     setPos({ top, left });
-    menuRef.current.querySelector<HTMLElement>("[role=menuitem]:not([disabled])")?.focus();
+    menuRef.current.querySelector<HTMLElement>("[role^=menuitem]:not([disabled])")?.focus();
   }, [anchor, align]);
 
   useEffect(() => {
@@ -223,7 +232,7 @@ export function Menu({ trigger, items, label, align = "end" }: { trigger: (props
       if (!menuRef.current?.contains(e.target as Node)) close();
     };
     const onKey = (e: KeyboardEvent) => {
-      const list = [...(menuRef.current?.querySelectorAll<HTMLElement>("[role=menuitem]:not([disabled])") ?? [])];
+      const list = [...(menuRef.current?.querySelectorAll<HTMLElement>("[role^=menuitem]:not([disabled])") ?? [])];
       const idx = list.indexOf(document.activeElement as HTMLElement);
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -280,7 +289,8 @@ export function Menu({ trigger, items, label, align = "end" }: { trigger: (props
                 <button
                   key={item.label}
                   type="button"
-                  role="menuitem"
+                  role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+                  aria-checked={item.checked}
                   disabled={item.disabled}
                   className={`menu__item ${item.danger ? "menu__item--danger" : ""}`}
                   onClick={(e) => {
@@ -291,6 +301,7 @@ export function Menu({ trigger, items, label, align = "end" }: { trigger: (props
                 >
                   {item.icon}
                   {item.label}
+                  {item.checked && <Check size={15} className="menu__check" />}
                 </button>
               ),
             )}
@@ -331,7 +342,8 @@ export function Segmented<T extends string | number>({
       onKeyDown={(e) => {
         if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
           e.preventDefault();
-          const next = options[(idx + (e.key === "ArrowRight" ? 1 : -1) + options.length) % options.length];
+          const forward = (e.key === "ArrowRight") !== (getLang() === "fa");
+          const next = options[(idx + (forward ? 1 : -1) + options.length) % options.length];
           onChange(next.value);
           requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
         }
@@ -393,12 +405,12 @@ export function ProgressRing({ value, size = 56, stroke = 6, label }: { value: n
   const c = 2 * Math.PI * r;
   const gid = useId().replace(/:/g, "");
   return (
-    <div style={{ position: "relative", width: size, height: size, flex: "none" }} role="img" aria-label={`${Math.round(value * 100)}% complete`}>
+    <div style={{ position: "relative", width: size, height: size, flex: "none" }} role="img" aria-label={t.percentDone(Math.round(value * 100))}>
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#c4b5fd" />
-            <stop offset="1" stopColor="#7c3aed" />
+            <stop offset="0" style={{ stopColor: "var(--violet-300)" }} />
+            <stop offset="1" style={{ stopColor: "var(--violet-600)" }} />
           </linearGradient>
         </defs>
         <circle className="ring__track" cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} />
@@ -451,13 +463,13 @@ export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   return createPortal(
     <div className="toasts" role="status" aria-live="polite">
-      {toasts.map((t) => (
-        <LiquidGlass key={t.id} dense radius={16} strength={12} bezel={10} className={`toast toast--${t.kind}`}>
+      {toasts.map((item) => (
+        <LiquidGlass key={item.id} dense radius={16} strength={12} bezel={10} className={`toast toast--${item.kind}`}>
           <span className="toast__icon">
-            {t.kind === "success" ? <Check size={16} /> : t.kind === "error" ? <CircleAlert size={16} /> : <Info size={16} />}
+            {item.kind === "success" ? <Check size={16} /> : item.kind === "error" ? <CircleAlert size={16} /> : <Info size={16} />}
           </span>
-          <span style={{ flex: 1 }}>{t.message}</span>
-          <IconButton label="Dismiss" onClick={() => dismissToast(t.id)} style={{ width: 22, height: 22, marginTop: -2 }}>
+          <span style={{ flex: 1 }}>{item.message}</span>
+          <IconButton label={t.dismiss} onClick={() => dismissToast(item.id)} style={{ width: 22, height: 22, marginTop: -2 }}>
             <X size={14} />
           </IconButton>
         </LiquidGlass>
