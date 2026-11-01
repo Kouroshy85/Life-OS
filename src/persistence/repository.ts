@@ -7,6 +7,7 @@
 import type { CompiledPlan } from "../domain/goalCompiler";
 import { plansToCommitments } from "../domain/plans";
 import type { RevisionPlan } from "../domain/revision";
+import type { PlanColor } from "../domain/types";
 import {
   DEFAULT_PREFERENCES,
   type Commitment,
@@ -43,8 +44,11 @@ const b = (v: unknown) => Number(v) === 1;
 const s = (v: unknown) => (v == null ? null : String(v));
 const n = (v: unknown) => (v == null ? null : Number(v));
 
+const colorFrom = (v: unknown): PlanColor | null => (v == null ? null : (Number(v) as PlanColor));
+
 const goalFrom = (r: Row): Goal => ({
   id: String(r.id),
+  color: colorFrom(r.color),
   title: String(r.title),
   description: String(r.description ?? ""),
   targetDate: s(r.target_date),
@@ -123,6 +127,7 @@ const planFrom = (r: Row): Plan => ({
   goalId: s(r.goal_id),
   isBreak: b(r.is_break),
   isSample: b(r.is_sample),
+  color: colorFrom(r.color),
   createdAt: String(r.created_at),
   updatedAt: String(r.updated_at),
 });
@@ -255,6 +260,7 @@ export function makePlan(partial: Partial<Plan> & Pick<Plan, "type" | "title" | 
     goalId: null,
     isBreak: false,
     isSample: false,
+    color: null,
     createdAt: ts,
     updatedAt: ts,
     ...partial,
@@ -508,13 +514,14 @@ export class Repository {
     return goalId;
   }
 
-  async updateGoal(id: string, patch: Partial<Pick<Goal, "title" | "description" | "targetDate" | "archived" | "sortOrder">>) {
+  async updateGoal(id: string, patch: Partial<Pick<Goal, "title" | "description" | "targetDate" | "archived" | "sortOrder" | "color">>) {
     const row: Record<string, SqlParam> = { updated_at: nowIso() };
     if (patch.title !== undefined) row.title = patch.title;
     if (patch.description !== undefined) row.description = patch.description;
     if (patch.targetDate !== undefined) row.target_date = patch.targetDate;
     if (patch.archived !== undefined) row.archived = bool(patch.archived);
     if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+    if (patch.color !== undefined) row.color = patch.color;
     const st = update("goals", id, row);
     await this.db.execute(st.sql, st.params);
   }
@@ -676,14 +683,14 @@ export class Repository {
 
   planUpsert(p: Plan): SqlStatement {
     return {
-      sql: `INSERT INTO plans (id, type, title, description, weekdays, dates, valid_from, start_min, end_min, goal_id, is_break, is_sample, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      sql: `INSERT INTO plans (id, type, title, description, weekdays, dates, valid_from, start_min, end_min, goal_id, is_break, is_sample, color, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET type = excluded.type, title = excluded.title, description = excluded.description,
               weekdays = excluded.weekdays, dates = excluded.dates, valid_from = excluded.valid_from, start_min = excluded.start_min,
-              end_min = excluded.end_min, goal_id = excluded.goal_id, updated_at = excluded.updated_at`,
+              end_min = excluded.end_min, goal_id = excluded.goal_id, color = excluded.color, updated_at = excluded.updated_at`,
       params: [
         p.id, p.type, p.title, p.description, p.weekdays, p.dates ? JSON.stringify(p.dates) : null, p.validFrom,
-        p.start, p.end, p.goalId, bool(p.isBreak), bool(p.isSample), p.createdAt, nowIso(),
+        p.start, p.end, p.goalId, bool(p.isBreak), bool(p.isSample), p.color, p.createdAt, nowIso(),
       ],
     };
   }

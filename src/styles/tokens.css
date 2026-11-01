@@ -18,6 +18,7 @@
   --plan-default-rgb: 167 139 250;
   --plan-goal-rgb: 45 212 191;
   --plan-event-rgb: 251 191 36;
+  --plan4-rgb: 251 113 133;
   --now-rgb: 244 114 182;
   --glass-rgb: 28 25 44;
   --overlay-rgb: 5 5 10;
@@ -59,6 +60,10 @@
   --cd-tint-2: #6754a0;
   --on-now: #ffffff;
   --on-plan-event: #1c1917;
+  --on-plan-1: #1c1917;
+  --on-plan-2: #1c1917;
+  --on-plan-3: #1c1917;
+  --on-plan-4: #1c1917;
 
   /* Surfaces */
   --surface: rgb(var(--ink) / 0.028);

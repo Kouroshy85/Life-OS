@@ -1,12 +1,13 @@
 import { CalendarClock, Clock3, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { num } from "../../domain/locale";
-import { PLAN_PRIORITY } from "../../domain/plans";
+import { PLAN_PRIORITY, planColor } from "../../domain/plans";
 import { formatClock, formatDuration } from "../../domain/time";
 import type { Plan, PlanType } from "../../domain/types";
 import { t } from "../../i18n";
-import { deletePlan, selectGoal, setPlannerMode, useApp, type PlannerMode } from "../../state/store";
+import { deletePlan, selectGoal, setPlanColor, setPlannerMode, useApp, type PlannerMode } from "../../state/store";
 import { Button, Confirm, Empty, IconButton, Segmented } from "../../ui/primitives";
+import { ColorPicker } from "./ColorPicker";
 import { PLAN_ICON, planDaysLabel, PlanWizard } from "./PlanWizard";
 
 export function PlannerSwitch({ mode }: { mode: PlannerMode }) {
@@ -83,7 +84,7 @@ export function PlansView() {
                   {list.map((plan) => {
                     const goal = plan.goalId ? goals.find((g) => g.id === plan.goalId) : null;
                     return (
-                      <li key={plan.id} className={`plan-row plan-row--${plan.type}`}>
+                      <li key={plan.id} className={`plan-row plan-c${planColor(plan, goals)}`}>
                         <div className="plan-row__main">
                           <strong className="plan-row__title">
                             {plan.title} {plan.isSample && <span className="badge-sample">{t.sample}</span>}
@@ -103,6 +104,7 @@ export function PlansView() {
                           </div>
                         </div>
                         <div className="plan-row__actions">
+                          <ColorPicker label={t.colorOf(plan.title)} value={planColor(plan, goals)} onChange={(color) => setPlanColor(plan, color)} />
                           <IconButton label={t.editPlanOf(plan.title)} onClick={() => setWizard({ type: plan.type, plan })}>
                             <Pencil size={16} />
                           </IconButton>

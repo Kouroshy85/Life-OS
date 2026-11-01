@@ -802,6 +802,16 @@ export const fa: Dict = {
   quoteYours: "مال خودت",
   quoteDuplicate: "این جمله از قبل تو لیست هست.",
   quotesRestore: "جمله‌های حذف‌شده رو برگردون",
+  // ---- plan colours
+  qPlanColor: "چه رنگی باشه؟",
+  hintPlanColor: "تو برنامه‌ی هفته این شکلی می‌بینیش. اینا رنگای تمته، پس با عوض شدن تم اینم عوض می‌شه.",
+  hintGoalColor: "این رنگ برای همه‌ی جلسه‌های این هدف عوض می‌شه.",
+  colorName: (n: string) => `رنگ ${n}`,
+  colorOf: (title: string) => `رنگ ${title}`,
+  colorUsed: (names: string) => `الان مال ${names}ه`,
+  colorFree: "هنوز استفاده نشده",
+  planColorLabel: "رنگش تو برنامه‌ی هفته",
+  goalColorLabel: "رنگ این هدف تو برنامه‌ی هفته",
   // ---- themes
   themeTitle: "تم",
   themeHint: "همه‌ی رنگ‌ها، سایه‌ها و درخشش‌های برنامه و صحنه‌ی پشتش رو عوض می‌کنه.",

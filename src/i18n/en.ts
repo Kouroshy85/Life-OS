@@ -797,6 +797,16 @@ export const en = {
   quoteYours: "Yours",
   quoteDuplicate: "That quote is already on the list.",
   quotesRestore: "Bring back removed quotes",
+  // ---- plan colours
+  qPlanColor: "Which colour?",
+  hintPlanColor: "This is how it'll look in your weekly plan. These are your theme's colours, so they change with it.",
+  hintGoalColor: "This changes every session of this goal.",
+  colorName: (n: string) => `Colour ${n}`,
+  colorOf: (title: string) => `Colour of ${title}`,
+  colorUsed: (names: string) => `Used by ${names}`,
+  colorFree: "Not used yet",
+  planColorLabel: "Colour in your weekly plan",
+  goalColorLabel: "Colour of this goal in your weekly plan",
   // ---- themes
   themeTitle: "Theme",
   themeHint: "Changes every colour, shadow and glow in the app, and the scene behind it.",

@@ -17,6 +17,7 @@ function plan(p: Partial<Plan> = {}): Plan {
     id: `p${seq}`,
     type: "default",
     title: "Plan",
+    color: null,
     description: "",
     weekdays: dayBit(0),
     dates: null,

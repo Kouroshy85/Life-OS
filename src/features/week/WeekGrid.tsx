@@ -1,4 +1,4 @@
-import { layoutLanes, occursOn } from "../../domain/plans";
+import { layoutLanes, occursOn, planColor, TYPE_COLOR } from "../../domain/plans";
 import { formatClock, formatShortDate, weekdayOf } from "../../domain/time";
 import type { DateKey, Plan } from "../../domain/types";
 import { t } from "../../i18n";
@@ -14,6 +14,7 @@ const DAY_END = 1440;
  */
 export function WeekGrid({ dates, plans, highlight, onSelect }: { dates: DateKey[]; plans: Plan[]; highlight?: Set<string>; onSelect?: (plan: Plan) => void }) {
   const { today, nowMin } = useApp((s) => s.clock);
+  const goals = useApp((s) => s.goals);
   const inWeek = dates.flatMap((date) => plans.filter((p) => occursOn(p, date)));
   const earliest = Math.min(DEFAULT_START, ...inWeek.map((p) => p.start));
   const gridStart = Math.floor(earliest / COLUMN) * COLUMN;
@@ -62,7 +63,7 @@ export function WeekGrid({ dates, plans, highlight, onSelect }: { dates: DateKey
                       title={label}
                       aria-label={label}
                       disabled={!onSelect}
-                      className={`wg__block wg__block--${plan.type} ${dimmed ? "wg__block--dim" : ""} ${lit ? "wg__block--lit" : ""} ${count > 1 ? "wg__block--tight" : ""} ${plan.end - plan.start < 90 ? "wg__block--narrow" : ""}`}
+                      className={`wg__block plan-c${planColor(plan, goals)} ${dimmed ? "wg__block--dim" : ""} ${lit ? "wg__block--lit" : ""} ${count > 1 ? "wg__block--tight" : ""} ${plan.end - plan.start < 90 ? "wg__block--narrow" : ""}`}
                       style={{
                         insetInlineStart: pct(plan.start - gridStart),
                         width: pct(plan.end - plan.start),
@@ -94,11 +95,19 @@ export function WeekGrid({ dates, plans, highlight, onSelect }: { dates: DateKey
 }
 
 export function PlanLegend() {
+  const plans = useApp((s) => s.plans);
+  const goals = useApp((s) => s.goals);
+  // Colours only mean a type until you start choosing your own.
+  const byType = plans.every((p) => planColor(p, goals) === TYPE_COLOR[p.type]);
   return (
     <div className="wg-legend" aria-label={t.legendLabel}>
-      <span><i className="plan-dot plan-dot--default" /> {t.groupDefault}</span>
-      <span><i className="plan-dot plan-dot--goal" /> {t.groupGoal}</span>
-      <span><i className="plan-dot plan-dot--event" /> {t.groupEvent}</span>
+      {byType && (
+        <>
+          <span><i className="plan-dot plan-dot--default" /> {t.groupDefault}</span>
+          <span><i className="plan-dot plan-dot--goal" /> {t.groupGoal}</span>
+          <span><i className="plan-dot plan-dot--event" /> {t.groupEvent}</span>
+        </>
+      )}
       <span className="faint">{t.legendPriority}</span>
     </div>
   );
