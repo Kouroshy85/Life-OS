@@ -9,6 +9,7 @@ import { getLang, setLang, weekStartDay, type Lang } from "../domain/locale";
 import { dayBit, weekDates } from "../domain/plans";
 import { hasLetters } from "../domain/text";
 import { DEFAULT_THEME, themeById, themeTokens, type ThemeId } from "../domain/themes";
+import type { PlanColor } from "../domain/types";
 import { dateTimeKey, formatClock, formatDuration, minutesOfDay, toDateKey } from "../domain/time";
 import { explain, t } from "../i18n";
 import type {
@@ -428,7 +429,7 @@ export async function createGoalWithSessions(plan: CompiledPlan, sessions: GoalS
   return id;
 }
 
-export const updateGoal = (id: string, patch: Partial<Pick<Goal, "title" | "description" | "targetDate" | "archived">>) =>
+export const updateGoal = (id: string, patch: Partial<Pick<Goal, "title" | "description" | "targetDate" | "archived" | "color">>) =>
   mutate(() => R().updateGoal(id, patch));
 
 /** Lowers a goal's weekly hours and re-plans its sessions. Returns a message if that isn't possible. */
@@ -678,6 +679,14 @@ export async function savePlan(plan: Plan, isNew: boolean) {
   if (!ok) return false;
   await reflowAffected({ t: isNew ? "added" : "changed", title: plan.title, at: plan.start });
   return true;
+}
+
+/** A goal's sessions share one colour, so changing any of them changes the goal. */
+export async function setPlanColor(plan: Plan, color: PlanColor) {
+  await mutate(async () => {
+    if (plan.goalId) await R().updateGoal(plan.goalId, { color });
+    else await R().run([R().planUpsert({ ...plan, color })]);
+  });
 }
 
 export async function deletePlan(id: string) {

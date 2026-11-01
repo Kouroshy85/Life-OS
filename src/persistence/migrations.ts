@@ -212,6 +212,14 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 4,
+    name: "plan and goal colours",
+    statements: [
+      `ALTER TABLE goals ADD COLUMN color INTEGER CHECK (color IS NULL OR color BETWEEN 1 AND 4)`,
+      `ALTER TABLE plans ADD COLUMN color INTEGER CHECK (color IS NULL OR color BETWEEN 1 AND 4)`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

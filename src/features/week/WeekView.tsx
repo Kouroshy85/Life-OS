@@ -2,14 +2,15 @@ import { CalendarPlus, ChevronLeft, ChevronRight, Clock3, Coffee, Pencil, Sparkl
 import { useMemo, useState } from "react";
 import { freeTimes } from "../../domain/availability";
 import { weekStartDay } from "../../domain/locale";
-import { weekDates } from "../../domain/plans";
+import { planColor, weekDates } from "../../domain/plans";
 import { addDays, formatClock, formatDayClock, formatDuration, formatMonthYear, formatShortDate, weekdayOf } from "../../domain/time";
 import type { Plan, PlanType } from "../../domain/types";
 import { t } from "../../i18n";
-import { deletePlan, navigate, openComposer, useApp } from "../../state/store";
+import { deletePlan, navigate, openComposer, setPlanColor, useApp } from "../../state/store";
 import { DateInput } from "../../ui/fields";
 import { LiquidGlass } from "../../ui/LiquidGlass";
 import { Button, Confirm, Dialog, IconButton } from "../../ui/primitives";
+import { ColorPicker } from "../planner/ColorPicker";
 import { PLAN_ICON, planDaysLabel, PlanWizard } from "../planner/PlanWizard";
 import { PlanLegend, WeekGrid } from "./WeekGrid";
 
@@ -79,7 +80,7 @@ export function WeekView() {
         onClose={() => setSelected(null)}
         onEdit={(plan) => {
           setSelected(null);
-          setAdding({ type: plan.type, plan });
+          setAdding({ type: plan.type, plan: plans.find((p) => p.id === plan.id) ?? plan });
         }}
         onDelete={(plan) => {
           setSelected(null);
@@ -98,7 +99,10 @@ export function WeekView() {
 }
 
 function PlanDialog({ plan, onClose, onEdit, onDelete }: { plan: Plan | null; onClose: () => void; onEdit: (p: Plan) => void; onDelete: (p: Plan) => void }) {
+  const plans = useApp((s) => s.plans);
+  const goals = useApp((s) => s.goals);
   if (!plan) return null;
+  const current = plans.find((p) => p.id === plan.id) ?? plan;
   const Icon = PLAN_ICON[plan.type];
   const typeName = { default: t.groupDefault, goal: t.groupGoal, event: t.groupEvent }[plan.type];
   return (
@@ -129,6 +133,10 @@ function PlanDialog({ plan, onClose, onEdit, onDelete }: { plan: Plan | null; on
           {formatClock(plan.start)}–{formatClock(plan.end)} · {formatDuration(plan.end - plan.start)}
         </span>
         <span className="chip">{planDaysLabel(plan)}</span>
+      </div>
+      <div className="color-field">
+        <span className="muted">{plan.goalId ? t.goalColorLabel : t.planColorLabel}</span>
+        <ColorPicker label={t.colorOf(plan.title)} value={planColor(current, goals)} onChange={(color) => setPlanColor(current, color)} />
       </div>
     </Dialog>
   );

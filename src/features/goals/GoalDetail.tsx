@@ -3,6 +3,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { ArrowDown, ArrowUp, CalendarDays, FolderPlus, ListPlus, MoreHorizontal, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { num, pct } from "../../domain/locale";
+import { TYPE_COLOR } from "../../domain/plans";
 import { formatDuration, formatShortDate } from "../../domain/time";
 import { t } from "../../i18n";
 import { DateInput } from "../../ui/fields";
@@ -22,6 +23,7 @@ import {
 } from "../../state/store";
 import { InlineText } from "../../ui/InlineText";
 import { Bar, Button, Confirm, IconButton, Menu, ProgressRing } from "../../ui/primitives";
+import { ColorPicker } from "../planner/ColorPicker";
 import { SourceBadge } from "./GoalComposer";
 import { AbandonGoalDialog } from "./AbandonGoalDialog";
 import { ReviseDialog } from "./ReviseDialog";
@@ -81,6 +83,10 @@ export function GoalDetail({ goal }: { goal: Goal }) {
               <CalendarDays size={14} />
               <span className="faint">{t.target}</span>
               <DateInput bare aria-label={t.targetDate} value={goal.targetDate} onChange={(v) => updateGoal(goal.id, { targetDate: v })} />
+            </span>
+            <span className="color-field">
+              <span className="faint">{t.goalColorLabel}</span>
+              <ColorPicker label={t.colorOf(goal.title)} value={goal.color ?? TYPE_COLOR.goal} onChange={(color) => updateGoal(goal.id, { color })} />
             </span>
             <span className="faint tabular">
               {t.tasksCount(num(progress.done), num(progress.total))} · {t.ofDuration(formatDuration(progress.doneMin), formatDuration(progress.totalMin))}

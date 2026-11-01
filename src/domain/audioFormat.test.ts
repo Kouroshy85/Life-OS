@@ -87,7 +87,7 @@ describe("decreasing a goal's hours", () => {
   const prefs = DEFAULT_PREFERENCES;
   const base = (p: Partial<Plan>): Plan => ({
     id: p.id ?? "x", type: "default", title: "x", description: "", weekdays: ALL_DAYS, dates: null, validFrom: null,
-    start: 540, end: 1020, goalId: null, isBreak: false, isSample: false, createdAt: "x", updatedAt: "x", ...p,
+    start: 540, end: 1020, goalId: null, isBreak: false, isSample: false, color: null, createdAt: "x", updatedAt: "x", ...p,
   });
   const asPlans = (goalId: string, sessions: ReturnType<typeof planGoalSessions>["sessions"]): Plan[] =>
     sessions.map((s, i) => base({ id: `${goalId}-${i}`, type: "goal", goalId, weekdays: dayBit(s.weekday), start: s.start, end: s.end }));

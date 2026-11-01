@@ -51,6 +51,36 @@ describe("upgrading from version 1", () => {
   });
 });
 
+describe("plan and goal colours", () => {
+  it("saves a plan's colour and can change it", async () => {
+    const plan = makePlan({ type: "default", title: "Gym", start: 540, end: 600, weekdays: 2, color: 4 });
+    await repo.run([repo.planUpsert(plan)]);
+    expect((await repo.loadSnapshot()).plans[0].color).toBe(4);
+    await repo.run([repo.planUpsert({ ...plan, color: 2 })]);
+    expect((await repo.loadSnapshot()).plans[0].color).toBe(2);
+  });
+
+  it("leaves existing plans without a colour", async () => {
+    await repo.run([repo.planUpsert(makePlan({ type: "default", title: "Gym", start: 540, end: 600, weekdays: 2 }))]);
+    expect((await repo.loadSnapshot()).plans[0].color).toBeNull();
+  });
+
+  it("allows at most four colours", async () => {
+    const plan = makePlan({ type: "default", title: "Gym", start: 540, end: 600, weekdays: 2, color: 5 as never });
+    await expect(repo.run([repo.planUpsert(plan)])).rejects.toThrow();
+  });
+
+  it("keeps old data when upgrading from version 3", async () => {
+    const old = await createMemoryDriver();
+    for (const m of MIGRATIONS.filter((x) => x.version <= 3)) await old.batch(m.statements.map((sql) => ({ sql })));
+    await old.execute("PRAGMA user_version = 3");
+    await old.execute("INSERT INTO plans (id, type, title, weekdays, start_min, end_min, created_at, updated_at) VALUES ('p', 'default', 'Gym', 2, 540, 600, 'x', 'x')");
+    expect(await migrate(old)).toEqual({ from: 3, to: LATEST_VERSION });
+    const snap = await new Repository(old).loadSnapshot();
+    expect(snap.plans[0]).toMatchObject({ id: "p", title: "Gym", color: null });
+  });
+});
+
 describe("dreams, music and quotes", () => {
   it("saves and edits dreams, newest first", async () => {
     await repo.saveDream({ id: "a", title: "See Japan", body: "Spring", createdAt: "2026-01-01" });

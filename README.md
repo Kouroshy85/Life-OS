@@ -106,6 +106,8 @@ Everything you lock in is a **plan**, in one of three colours. Priority decides 
 
 Seven themes change every colour, shadow and glow, plus an illustrated scene behind the app: Default, Jungle, Shadow, Strawberry dreams, Neutral elegance, Sky and Wine. Switch from the sidebar or **Settings → Theme**.
 
+Each theme offers four plan colours. Any plan or goal can use one of them, from the plan wizard, the week view, the plan list or the goal page, and the choice follows the theme. A goal's sessions share one colour.
+
 Palettes live in `src/domain/themes.ts`. Stylesheets only use the tokens they fill in, and tests fail if a theme's text is hard to read or a raw colour slips into a stylesheet. Scenes are in `src/features/shell/ThemeScene.tsx`.
 
 ## Languages

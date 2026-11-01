@@ -8,7 +8,7 @@
 
 import { overlaps } from "./intervals";
 import { addDays, weekdayOf } from "./time";
-import type { Commitment, DateKey, Minutes, Plan, PlanType } from "./types";
+import { PLAN_COLORS, type Commitment, type DateKey, type Goal, type Minutes, type Plan, type PlanColor, type PlanType } from "./types";
 
 export const PLAN_PRIORITY: Record<PlanType, number> = { default: 1, goal: 2, event: 3 };
 
@@ -112,4 +112,35 @@ export function layoutLanes(plans: Plan[]): { plan: Plan; lane: number; lanes: n
     const touching = placed.filter((o) => overlaps(o.plan, p.plan));
     return { ...p, lanes: Math.max(...touching.map((o) => o.lane)) + 1 };
   });
+}
+
+/** The colour each type has until you choose another. */
+export const TYPE_COLOR: Record<PlanType, PlanColor> = { default: 1, goal: 2, event: 3 };
+
+/** A goal's sessions share one colour, so they read as one thing across the week. */
+export function planColor(plan: Pick<Plan, "type" | "goalId" | "color">, goals: Pick<Goal, "id" | "color">[]): PlanColor {
+  const linked = plan.goalId ? goals.find((g) => g.id === plan.goalId) : null;
+  return linked?.color ?? plan.color ?? TYPE_COLOR[plan.type];
+}
+
+/** What's using each colour. A goal counts once however many sessions it has. */
+export function colorUsage(plans: Plan[], goals: Pick<Goal, "id" | "title" | "color">[], exceptPlanId?: string): Record<PlanColor, string[]> {
+  const usage: Record<PlanColor, string[]> = { 1: [], 2: [], 3: [], 4: [] };
+  const seenGoals = new Set<string>();
+  for (const plan of plans) {
+    if (plan.id === exceptPlanId) continue;
+    if (plan.goalId) {
+      if (seenGoals.has(plan.goalId)) continue;
+      seenGoals.add(plan.goalId);
+    }
+    const name = (plan.goalId && goals.find((g) => g.id === plan.goalId)?.title) || plan.title;
+    usage[planColor(plan, goals)].push(name);
+  }
+  return usage;
+}
+
+/** For a new plan: the least used colour, so it stands out. The type's own colour wins a tie. */
+export function suggestColor(type: PlanType, plans: Plan[], goals: Pick<Goal, "id" | "title" | "color">[]): PlanColor {
+  const usage = colorUsage(plans, goals);
+  return PLAN_COLORS.reduce((best, color) => (usage[color].length < usage[best].length ? color : best), TYPE_COLOR[type]);
 }

@@ -15,8 +15,14 @@ export type TaskStatus = "todo" | "in_progress" | "done" | "skipped";
 /** Where a plan (or a task) came from. Never claim "ai" unless a model actually answered. */
 export type PlanSource = "template" | "ai" | "manual";
 
+/** One of the current theme's four plan colours, so a choice follows the theme. */
+export type PlanColor = 1 | 2 | 3 | 4;
+export const PLAN_COLORS: PlanColor[] = [1, 2, 3, 4];
+
 export interface Goal {
   id: string;
+  /** Colour of this goal's sessions in the week. Null keeps the usual goal colour. */
+  color: PlanColor | null;
   title: string;
   description: string;
   targetDate: DateKey | null;
@@ -97,6 +103,8 @@ export interface Plan {
   goalId: string | null;
   isBreak: boolean;
   isSample: boolean;
+  /** Null keeps the usual colour for this type. A goal's sessions follow the goal instead. */
+  color: PlanColor | null;
   createdAt: string;
   updatedAt: string;
 }

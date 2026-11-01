@@ -41,6 +41,8 @@ export interface Theme {
   planDefault: string;
   planGoal: string;
   planEvent: string;
+  /** With the three above, the four colours you can give a plan or goal. */
+  plan4: string;
   /** The "current time" marker. */
   now: string;
   glass: string;
@@ -68,7 +70,7 @@ export const THEMES: Theme[] = [
     a300: "#c4b5fd", a400: "#a78bfa", a500: "#8b5cf6", a600: "#7c3aed", a700: "#6d28d9", alt: "#6366f1",
     success: "#4ade80", warning: "#fbbf24", danger: "#fb7185", info: "#7dd3fc",
     warningInk: "#fde68a", dangerInk: "#fecdd3", infoInk: "#bae6fd",
-    planDefault: "#a78bfa", planGoal: "#2dd4bf", planEvent: "#fbbf24", now: "#f472b6",
+    planDefault: "#a78bfa", planGoal: "#2dd4bf", planEvent: "#fbbf24", plan4: "#fb7185", now: "#f472b6",
     glass: "#1c192c", overlay: "#05050a", titleFrom: "#ffffff", titleTo: "#c9c2e6",
     cdDark: "#1c1930", cdMid: "#2b2640", cdLight: "#a79cc9", panel: 0,
     shades: {
@@ -86,7 +88,7 @@ export const THEMES: Theme[] = [
     a300: "#b7d8a8", a400: "#8fbf7f", a500: "#5f9a55", a600: "#3f7a3d", a700: "#2c5a30", alt: "#7a5230",
     success: "#8fce7a", warning: "#dfb35a", danger: "#e88a6a", info: "#a9c79a",
     warningInk: "#ecd39a", dangerInk: "#f3c3b0", infoInk: "#cfe3c5",
-    planDefault: "#8fbf7f", planGoal: "#d9a066", planEvent: "#d8c465", now: "#f0b24a",
+    planDefault: "#8fbf7f", planGoal: "#c98a52", planEvent: "#e3d36a", plan4: "#7fc4b8", now: "#f0b24a",
     glass: "#1e2616", overlay: "#080503", titleFrom: "#f7f1e0", titleTo: "#b7d8a8",
     cdDark: "#1b1209", cdMid: "#3a2a18", cdLight: "#8fbf7f", panel: 0.9,
   },
@@ -99,7 +101,7 @@ export const THEMES: Theme[] = [
     a300: "#f2f2f2", a400: "#d6d6d6", a500: "#ececec", a600: "#ffffff", a700: "#bdbdbd", alt: "#4a4a4a",
     success: "#e2e2e2", warning: "#cfcfcf", danger: "#ffffff", info: "#bdbdbd",
     warningInk: "#e6e6e6", dangerInk: "#ffffff", infoInk: "#e0e0e0",
-    planDefault: "#ffffff", planGoal: "#a3a3a3", planEvent: "#6f6f6f", now: "#ffffff",
+    planDefault: "#ffffff", planGoal: "#a3a3a3", planEvent: "#6f6f6f", plan4: "#4a4a4a", now: "#ffffff",
     glass: "#161616", overlay: "#000000", titleFrom: "#ffffff", titleTo: "#8f8f8f",
     cdDark: "#0a0a0a", cdMid: "#2a2a2a", cdLight: "#c8c8c8", panel: 0.9,
   },
@@ -112,7 +114,7 @@ export const THEMES: Theme[] = [
     a300: "#8a2a8f", a400: "#a8399f", a500: "#c93a95", a600: "#a6247f", a700: "#7b1fa2", alt: "#c77dff",
     success: "#16794a", warning: "#9a5408", danger: "#c01a55", info: "#3560c4",
     warningInk: "#7d4405", dangerInk: "#9c1344", infoInk: "#2a4ea3",
-    planDefault: "#d6409f", planGoal: "#7b3fe4", planEvent: "#e8765c", now: "#e0218a",
+    planDefault: "#d6409f", planGoal: "#7b3fe4", planEvent: "#e8765c", plan4: "#3f8fd6", now: "#e0218a",
     glass: "#ffeef6", overlay: "#5a1e5a", titleFrom: "#5a1a66", titleTo: "#c2368f",
     cdDark: "#f3c6e4", cdMid: "#fbdcef", cdLight: "#b98af0", panel: 0.9,
   },
@@ -125,7 +127,7 @@ export const THEMES: Theme[] = [
     a300: "#664930", a400: "#7a5c43", a500: "#8a6f58", a600: "#664930", a700: "#4f3622", alt: "#ccbeb1",
     success: "#47702f", warning: "#8a4f0d", danger: "#a02c1a", info: "#4f6b7c",
     warningInk: "#6f3f09", dangerInk: "#852213", infoInk: "#3f5766",
-    planDefault: "#664930", planGoal: "#997e67", planEvent: "#b5764a", now: "#a02c1a",
+    planDefault: "#664930", planGoal: "#997e67", planEvent: "#c4703a", plan4: "#5f7a6a", now: "#a02c1a",
     glass: "#ffe6d1", overlay: "#664930", titleFrom: "#664930", titleTo: "#997e67",
     cdDark: "#997e67", cdMid: "#ccbeb1", cdLight: "#ffdbbb", panel: 0.9,
   },
@@ -138,7 +140,7 @@ export const THEMES: Theme[] = [
     a300: "#1f6aa8", a400: "#2a7bbf", a500: "#3584c6", a600: "#2470ad", a700: "#1b5a8e", alt: "#9fc4dd",
     success: "#16794f", warning: "#935709", danger: "#bb3345", info: "#2470ad",
     warningInk: "#784706", dangerInk: "#992636", infoInk: "#1b5a8e",
-    planDefault: "#2a7bbf", planGoal: "#2f9aa8", planEvent: "#7d8a96", now: "#d9534f",
+    planDefault: "#2a7bbf", planGoal: "#1f9d8a", planEvent: "#7d8a96", plan4: "#1d3f66", now: "#d9534f",
     glass: "#f5faff", overlay: "#3c5a78", titleFrom: "#1d3347", titleTo: "#2a7bbf",
     cdDark: "#b8c7d3", cdMid: "#dbe6ee", cdLight: "#ffffff", panel: 0.9,
   },
@@ -151,7 +153,7 @@ export const THEMES: Theme[] = [
     a300: "#e7a2ac", a400: "#cf5f70", a500: "#a82a3f", a600: "#8e1b2e", a700: "#5f0f1d", alt: "#3d0a14",
     success: "#9cc27f", warning: "#dcae66", danger: "#ff7385", info: "#d1abb2",
     warningInk: "#edd2a5", dangerInk: "#ffc4cc", infoInk: "#e6cfd3",
-    planDefault: "#cf5f70", planGoal: "#e0b4bb", planEvent: "#b38a5a", now: "#ff5a6e",
+    planDefault: "#cf5f70", planGoal: "#e0b4bb", planEvent: "#b38a5a", plan4: "#8c6bb0", now: "#ff5a6e",
     glass: "#240c10", overlay: "#050102", titleFrom: "#fbeff0", titleTo: "#cf5f70",
     cdDark: "#1a0508", cdMid: "#3d0a14", cdLight: "#cf5f70", panel: 0.9,
   },
@@ -182,8 +184,10 @@ export function contrast(a: string, b: string): number {
 
 /** White or near-black, whichever can be read on this colour. */
 export function readableOn(color: string): string {
-  return contrast("#ffffff", color) >= 4.4 ? "#ffffff" : "#1c1917";
+  return contrast("#ffffff", color) >= contrast("#1c1917", color) ? "#ffffff" : "#1c1917";
 }
+
+export const planColors = (t: Theme): [string, string, string, string] => [t.planDefault, t.planGoal, t.planEvent, t.plan4];
 
 /** Every stylesheet token a theme fills in. */
 export function themeTokens(t: Theme): Record<string, string> {
@@ -193,7 +197,7 @@ export function themeTokens(t: Theme): Record<string, string> {
     "--ink": t.ink, "--well": t.well, "--shadow-rgb": t.shadow,
     "--a300": t.a300, "--a400": t.a400, "--a500": t.a500, "--a600": t.a600, "--a700": t.a700, "--alt": t.alt,
     "--success-rgb": t.success, "--warning-rgb": t.warning, "--danger-rgb": t.danger, "--info-rgb": t.info,
-    "--plan-default-rgb": t.planDefault, "--plan-goal-rgb": t.planGoal, "--plan-event-rgb": t.planEvent,
+    "--plan-default-rgb": t.planDefault, "--plan-goal-rgb": t.planGoal, "--plan-event-rgb": t.planEvent, "--plan4-rgb": t.plan4,
     "--now-rgb": t.now, "--glass-rgb": t.glass, "--overlay-rgb": t.overlay, "--bg-rgb": t.bg, "--bg2-rgb": t.bg2,
     "--a-bright": shade.aBright ?? t.a500, "--a-deep": shade.aDeep ?? t.a700, "--a-deepest": shade.aDeepest ?? t.a700,
     "--alt-2": shade.alt2 ?? t.alt, "--danger-2": shade.danger2 ?? t.danger,
@@ -210,6 +214,9 @@ export function themeTokens(t: Theme): Record<string, string> {
     "--on-accent-soft": shade.onAccentSoft ?? t.onAccent, "--on-danger": shade.onDanger ?? t.dangerInk, "--cd-tint-2": shade.cdTint2 ?? t.a500, "--on-now": readableOn(now2), "--on-plan-event": readableOn(t.planEvent),
     "--panel-alpha": String(t.panel),
   };
+  planColors(t).forEach((color, i) => {
+    out[`--on-plan-${i + 1}`] = readableOn(color);
+  });
   for (const [k, v] of Object.entries(triplets)) out[k] = hexToTriplet(v);
   return out;
 }

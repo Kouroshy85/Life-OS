@@ -3,16 +3,17 @@ import { useEffect, useMemo, useState } from "react";
 import { blockedOnCalendarDay } from "../../domain/availability";
 import { overlaps } from "../../domain/intervals";
 import { getLang, weekStartDay } from "../../domain/locale";
-import { ALL_DAYS, classifyConflicts, dayBit, planTimeProblem, weekDates, type PlanConflict } from "../../domain/plans";
+import { ALL_DAYS, classifyConflicts, colorUsage, dayBit, planColor, planTimeProblem, suggestColor, weekDates, type PlanConflict } from "../../domain/plans";
 import { textProblem } from "../../domain/text";
 import { addDays, formatClock, formatDuration, formatMonthYear, formatShortDate, parseDateKey, weekdayOf } from "../../domain/time";
-import type { DateKey, Minutes, Plan, PlanType } from "../../domain/types";
+import type { DateKey, Minutes, Plan, PlanColor, PlanType } from "../../domain/types";
 import { t } from "../../i18n";
 import { makePlan } from "../../persistence/repository";
-import { savePlan, useApp } from "../../state/store";
+import { savePlan, updateGoal, useApp } from "../../state/store";
 import { TextArea, TextInput, TimeInput } from "../../ui/fields";
 import { Button, Field, IconButton } from "../../ui/primitives";
 import { Wizard, WizardDone, WizardError, WizardQuestion } from "../../ui/Wizard";
+import { ColorOptions } from "./ColorPicker";
 
 export const PLAN_ICON = { default: Repeat, goal: Target, event: CalendarHeart };
 
@@ -39,13 +40,15 @@ export function textErrorMessage(problem: ReturnType<typeof textProblem>): strin
 
 const STEP_TITLE = 0;
 const STEP_DESC = 1;
-const STEP_DAYS = 2;
-const STEP_TIME = 3;
-const STEP_DONE = 4;
+const STEP_COLOR = 2;
+const STEP_DAYS = 3;
+const STEP_TIME = 4;
+const STEP_DONE = 5;
 
 /** Add or edit a plan, one question at a time. */
 export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean; onClose: () => void; type: PlanType; plan?: Plan | null; date?: DateKey }) {
   const plans = useApp((s) => s.plans);
+  const goals = useApp((s) => s.goals);
   const prefs = useApp((s) => s.prefs);
   const clock = useApp((s) => s.clock);
   const planType = plan?.type ?? type;
@@ -55,6 +58,7 @@ export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean;
   const [direction, setDirection] = useState<1 | -1>(1);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [color, setColor] = useState<PlanColor>(1);
   const [mask, setMask] = useState(0);
   const [dates, setDates] = useState<DateKey[]>([]);
   const [weekAnchor, setWeekAnchor] = useState(clock.today);
@@ -72,6 +76,7 @@ export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean;
     setDirection(1);
     setTitle(plan?.title ?? "");
     setDescription(plan?.description ?? "");
+    setColor(plan ? planColor(plan, goals) : suggestColor(type, plans, goals));
     setMask(plan?.weekdays ?? 0);
     setDates(plan?.dates ?? (date && date >= clock.today ? [date] : []));
     setWeekAnchor(plan?.dates?.[0] ?? date ?? clock.today);
@@ -110,6 +115,7 @@ export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean;
       end,
       weekdays: oneTime ? 0 : mask,
       dates: oneTime ? [...dates].sort() : null,
+      color: plan?.goalId ? plan.color : color,
     };
     if (plan) return { ...plan, ...fields };
     return makePlan({ type: planType, ...fields, validFrom: oneTime ? null : weekDates(clock.today, weekStartDay())[0] });
@@ -130,8 +136,9 @@ export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean;
     if (step === STEP_DESC) {
       const problem = textErrorMessage(textProblem(description, { required: false }));
       if (problem) return setError(problem);
-      return go(STEP_DAYS);
+      return go(STEP_COLOR);
     }
+    if (step === STEP_COLOR) return go(STEP_DAYS);
     if (step === STEP_DAYS) {
       if (oneTime ? dates.length === 0 : mask === 0) return setError(t.errNoDays);
       return go(STEP_TIME);
@@ -154,6 +161,7 @@ export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean;
       }
       setSaving(true);
       const saved = await savePlan(draft, !plan);
+      if (saved && plan?.goalId) await updateGoal(plan.goalId, { color });
       setSaving(false);
       if (saved) go(STEP_DONE);
     }
@@ -211,6 +219,13 @@ export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean;
               }}
             />
           </Field>
+        </>
+      )}
+
+      {step === STEP_COLOR && (
+        <>
+          <WizardQuestion title={t.qPlanColor} hint={plan?.goalId ? t.hintGoalColor : t.hintPlanColor} />
+          <ColorOptions value={color} onChange={setColor} title={title.trim()} usage={colorUsage(plans, goals, plan?.id)} />
         </>
       )}
 
@@ -287,7 +302,7 @@ export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean;
               <ul>
                 {blocking.slice(0, 4).map((c) => (
                   <li key={c.plan.id}>
-                    <span className={`plan-dot plan-dot--${c.plan.type}`} />
+                    <span className={`plan-dot plan-c${planColor(c.plan, goals)}`} />
                     {t.conflictLine(c.plan.title, conflictDay(c), formatClock(c.plan.start), formatClock(c.plan.end))}
                   </li>
                 ))}
@@ -301,7 +316,7 @@ export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean;
               <ul>
                 {outranked.slice(0, 4).map((c) => (
                   <li key={c.plan.id}>
-                    <span className={`plan-dot plan-dot--${c.plan.type}`} />
+                    <span className={`plan-dot plan-c${planColor(c.plan, goals)}`} />
                     {t.conflictLine(c.plan.title, conflictDay(c), formatClock(c.plan.start), formatClock(c.plan.end))}
                   </li>
                 ))}
