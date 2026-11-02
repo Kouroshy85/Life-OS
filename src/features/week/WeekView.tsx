@@ -69,7 +69,7 @@ export function WeekView() {
       </LiquidGlass>
 
       <div className="card week-card rise">
-        <WeekGrid dates={dates} plans={plans} onSelect={setSelected} />
+        <WeekGrid dates={dates} plans={plans} onSelect={setSelected} onLeaveWeek={setAnchor} />
         {plans.length === 0 && <p className="week-empty muted">{t.weekEmpty}</p>}
       </div>
 

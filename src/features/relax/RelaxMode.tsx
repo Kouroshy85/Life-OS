@@ -1,4 +1,4 @@
-import { Pause, Play, Plus, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Pause, Play, Plus, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatTrackTime, pickDifferent } from "../../domain/audioFormat";
 import { num } from "../../domain/locale";
@@ -267,6 +267,15 @@ export function RelaxMode() {
   const [newName, setNewName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
   const openPlaylist = playlists.find((p) => p.id === openId) ?? null;
+  const stage = useRef<HTMLDivElement>(null);
+  const [showingMusic, setShowingMusic] = useState(false);
+
+  // On phones, the timer and player take turns in the centre of the screen.
+  const swap = () => {
+    const target = stage.current?.querySelector(showingMusic ? ".relax-timer" : ".relax__music");
+    const instant = document.documentElement.classList.contains("lite");
+    target?.scrollIntoView({ block: "center", behavior: instant ? "auto" : "smooth" });
+  };
 
   useEffect(() => {
     if (isTauri()) {
@@ -318,7 +327,7 @@ export function RelaxMode() {
         <X size={20} />
       </IconButton>
 
-      <div className="relax__stage">
+      <div className="relax__stage" ref={stage} onScroll={(e) => setShowingMusic(e.currentTarget.scrollTop > e.currentTarget.clientHeight * 0.3)}>
         <section className="relax__music" aria-label={t.relaxMusic}>
           {openPlaylist ? (
             <PlaylistPanel key={openPlaylist.id} playlist={openPlaylist} player={player} onBack={() => setOpenId(null)} />
@@ -422,6 +431,11 @@ export function RelaxMode() {
 
         <TimerRing title={session.title} minutes={session.minutes} />
       </div>
+
+      <button type="button" className="relax-swap glass" onClick={swap}>
+        {showingMusic ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        {showingMusic ? t.relaxShowTimer : t.relaxShowMusic}
+      </button>
 
       {quote && (
         <p key={quote} className="relax__quote">

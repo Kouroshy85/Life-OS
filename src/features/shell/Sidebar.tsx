@@ -1,8 +1,8 @@
-import { CalendarRange, LayoutGrid, Languages, Leaf, Moon, Plus, Settings2, Sun, Target, Wallet } from "lucide-react";
+import { CalendarRange, LayoutGrid, Languages, Leaf, Moon, Plus, Settings2, Sun, Target, Wallet, X } from "lucide-react";
 import { num } from "../../domain/locale";
 import { formatDuration } from "../../domain/time";
 import { t } from "../../i18n";
-import { navigate, openComposer, openRelaxPicker, setLanguage, setPlannerMode, useApp, type View } from "../../state/store";
+import { navigate, openComposer, openRelaxPicker, setDrawerOpen, setLanguage, setPlannerMode, useApp, type View } from "../../state/store";
 import { LiquidGlass } from "../../ui/LiquidGlass";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
@@ -19,12 +19,13 @@ export function Sidebar() {
   const blocks = useApp((s) => s.blocks);
   const today = useApp((s) => s.clock.today);
   const lang = useApp((s) => s.lang);
+  const drawerOpen = useApp((s) => s.drawerOpen);
   const todays = blocks.filter((b) => b.date === today && !b.proposed && b.kind === "task" && b.state !== "skipped");
   const done = todays.filter((b) => b.state === "done");
   const doneMin = done.reduce((s, b) => s + (b.end - b.start), 0);
 
   return (
-    <LiquidGlass as="nav" className="sidebar" radius={28} bezel={20} strength={42} aria-label={t.navMain}>
+    <LiquidGlass as="nav" className={`sidebar ${drawerOpen ? "sidebar--open" : ""}`} radius={28} bezel={20} strength={42} aria-label={t.navMain}>
       <div className="sidebar__brand">
         <span className="sidebar__logo" aria-hidden="true">
           <svg viewBox="0 0 32 32" width="22" height="22">
@@ -40,6 +41,9 @@ export function Sidebar() {
           </svg>
         </span>
         <span className="sidebar__name">Life OS</span>
+        <button type="button" className="sidebar__close" aria-label={t.menuClose} onClick={() => setDrawerOpen(false)}>
+          <X size={19} />
+        </button>
       </div>
 
       <button type="button" className="sidebar__new" onClick={() => openComposer(true)} title={`${t.newGoal} (Ctrl+N)`}>

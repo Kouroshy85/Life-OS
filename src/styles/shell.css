@@ -144,7 +144,7 @@
   letter-spacing: -0.02em;
 }
 
-@media (max-width: 1180px) {
+@media (min-width: 821px) and (max-width: 1180px) {
   .sidebar {
     width: 70px;
     padding-inline-start: 10px;

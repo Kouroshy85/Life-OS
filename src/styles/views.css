@@ -1881,3 +1881,10 @@ html[lang="fa"] .stat__value {
   font-size: 22px;
   line-height: 1.35;
 }
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
