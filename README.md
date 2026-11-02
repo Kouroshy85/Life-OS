@@ -148,6 +148,12 @@ npm run tauri android build -- --apk
 
 On Windows, Tauri creates a symbolic link during this build, which needs Developer Mode turned on. The result is unsigned, so sign it with your own key before installing.
 
+## iPhone
+
+iPhones only install apps signed through an Apple account, so the IPA in each release can't be installed directly from GitHub. Sign and install it from a computer, for example with Sideloadly and an Apple ID. With a free Apple ID, the app stops opening after 7 days until it's installed again.
+
+Apple's tools only run on macOS, so the **iOS build** workflow in GitHub Actions builds the IPA on a Mac runner.
+
 ## License
 
 [MIT](LICENSE). Bundled fonts and libraries keep their own licences: see [third-party notices](THIRD_PARTY_NOTICES.md).
