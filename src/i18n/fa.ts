@@ -802,6 +802,7 @@ export const fa: Dict = {
   quoteYours: "مال خودت",
   quoteDuplicate: "این جمله از قبل تو لیست هست.",
   quotesRestore: "جمله‌های حذف‌شده رو برگردون",
+  madeBy: "ساخته شده توسط کوروش ثابتی",
   // ---- phone
   menuOpen: "باز کردن منو",
   menuClose: "بستن منو",

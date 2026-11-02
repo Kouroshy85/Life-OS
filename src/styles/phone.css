@@ -2,6 +2,12 @@
    Phone layout: side menu, bottom bar and pages fitted to a narrow screen
    ========================================================================= */
 
+:root {
+  /* The notch and home bar on iPhones. Android keeps its bars out of the way natively, so these are 0 there. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 .drawer-btn,
 .drawer-scrim,
 .tabbar,
@@ -33,7 +39,7 @@
   }
 
   .page {
-    padding: 74px 16px 108px;
+    padding: calc(74px + var(--safe-top)) 16px 20px;
   }
 
   .page-head {
@@ -70,7 +76,7 @@
     width: min(84vw, 320px);
     height: 100dvh;
     margin: 0;
-    padding: 16px 14px 18px;
+    padding: calc(16px + var(--safe-top)) 14px calc(18px + var(--safe-bottom));
     align-items: stretch;
     overflow-y: auto;
     visibility: hidden;
@@ -140,7 +146,7 @@
     display: grid;
     place-items: center;
     position: fixed;
-    top: 14px;
+    top: calc(14px + var(--safe-top));
     inset-inline-start: 14px;
     z-index: 30;
     width: 46px;
@@ -161,7 +167,7 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 5px;
     position: fixed;
-    bottom: 14px;
+    bottom: calc(14px + var(--safe-bottom));
     left: 50%;
     z-index: 30;
     width: min(calc((100vw - 32px) * 0.8), 320px);
@@ -233,7 +239,8 @@
   .dialog,
   .dialog--wide {
     width: 100%;
-    max-height: 92dvh;
+    max-height: calc(92dvh - var(--safe-top));
+    padding-bottom: var(--safe-bottom);
     border-radius: 26px 26px 0 0 !important;
     animation: sheet-up 340ms var(--ease);
   }
@@ -253,7 +260,7 @@
 
   .toasts {
     inset-inline: 16px;
-    bottom: 94px;
+    bottom: calc(94px + var(--safe-bottom));
     align-items: stretch;
   }
 
@@ -306,7 +313,7 @@
   }
 
   .toasts {
-    bottom: 94px;
+    bottom: calc(94px + var(--safe-bottom));
   }
 
   .week-actions {
@@ -333,7 +340,7 @@
   }
 
   .toolbar {
-    top: 68px;
+    top: calc(68px + var(--safe-top));
   }
 
   /* Relax: timer and player take turns in the centre, and the player peeks up from below. */
@@ -365,7 +372,7 @@
 
   .relax__music {
     flex: none;
-    margin-top: -172px;
+    margin-top: calc(-188px - var(--safe-bottom));
     padding-inline: 20px;
     min-height: auto;
     overflow: visible;
@@ -387,14 +394,14 @@
     inset-inline: 0;
     bottom: 0;
     z-index: 2;
-    height: 112px;
+    height: calc(128px + var(--safe-bottom));
     pointer-events: none;
     background: linear-gradient(to top, var(--relax-bg) 62%, transparent);
   }
 
   .relax-swap {
     position: absolute;
-    bottom: 52px;
+    bottom: calc(68px + var(--safe-bottom));
     left: 50%;
     z-index: 3;
     display: inline-flex;
@@ -417,9 +424,9 @@
   .relax__quote {
     position: absolute;
     inset-inline: 0;
-    bottom: 0;
+    bottom: calc(22px + var(--safe-bottom));
     z-index: 3;
-    padding: 0 20px 14px;
+    padding: 0 20px 6px;
     font-size: 12.5px;
   }
 
@@ -464,7 +471,7 @@
 
   .day-pill {
     position: sticky;
-    top: 68px;
+    top: calc(68px + var(--safe-top));
     z-index: 8;
     display: flex;
     align-items: center;
@@ -566,5 +573,21 @@
     inset-inline: 54px 0;
     font-size: 13px;
     text-align: center;
+  }
+}
+
+@media (max-width: 820px) {
+  .credit {
+    margin-top: 0;
+    padding: 0 16px calc(104px + var(--safe-bottom));
+  }
+
+  /* In Relax it sits under the quote, at the very bottom of the screen. */
+  .credit--relax {
+    position: absolute;
+    inset-inline: 0;
+    bottom: var(--safe-bottom);
+    z-index: 3;
+    padding: 0 20px 6px;
   }
 }
