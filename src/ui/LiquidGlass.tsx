@@ -9,6 +9,7 @@
  */
 
 import { forwardRef, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type HTMLAttributes } from "react";
+import { useApp } from "../state/store";
 
 const supportsRefraction = (() => {
   if (typeof navigator === "undefined") return false;
@@ -18,6 +19,8 @@ const supportsRefraction = (() => {
 
 const reducedTransparency =
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-transparency: reduce)").matches;
+
+const isPhone = typeof window !== "undefined" && window.matchMedia?.("(max-width: 820px)").matches;
 
 /** Signed distance from a point to a rounded rectangle centered at the origin. */
 function sdRoundRect(px: number, py: number, hw: number, hh: number, r: number) {
@@ -85,21 +88,25 @@ export interface LiquidGlassProps extends HTMLAttributes<HTMLDivElement> {
   blur?: number;
   /** Stronger tint for panels that hold dense content (dialogs, menus). */
   dense?: boolean;
+  /** Keep refracting on phones, where it's otherwise skipped to save battery and keep scrolling smooth. */
+  lens?: boolean;
   as?: "div" | "nav" | "aside" | "header" | "section";
 }
 
 export const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(function LiquidGlass(
-  { radius = 24, bezel = 16, strength = 36, blur = 14, dense = false, className = "", style, children, as = "div", ...rest },
+  { radius = 24, bezel = 16, strength = 36, blur = 14, dense = false, lens = false, className = "", style, children, as = "div", ...rest },
   forwarded,
 ) {
   const local = useRef<HTMLDivElement | null>(null);
   const id = `lg-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [map, setMap] = useState("");
+  const lite = useApp((s) => s.lite);
+  const canRefract = supportsRefraction && !reducedTransparency && !lite && (lens || !isPhone);
 
   useLayoutEffect(() => {
     const el = local.current;
-    if (!el || !supportsRefraction || reducedTransparency) return;
+    if (!el || !canRefract) return;
     let frame = 0;
     const measure = () => {
       cancelAnimationFrame(frame);
@@ -116,7 +123,7 @@ export const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(function
       ro.disconnect();
       cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [canRefract]);
 
   useEffect(() => {
     if (!size) return;
@@ -125,7 +132,7 @@ export const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>(function
     return () => clearTimeout(t);
   }, [size, radius, bezel]);
 
-  const refract = supportsRefraction && !reducedTransparency && map && size;
+  const refract = canRefract && map && size;
   const glassStyle: CSSProperties = {
     borderRadius: radius,
     ...(refract

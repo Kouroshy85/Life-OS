@@ -133,3 +133,21 @@ To add or change wording, edit `src/i18n/en.ts` and `src/i18n/fa.ts`. TypeScript
 | `↑` / `↓` on a block | Move 5 min (`Shift`: 15 min, `Alt`: resize) |
 | `Space` then `↑` / `↓` on a task handle | Reorder a task |
 | `Esc` | Close dialogs and menus |
+
+## Android
+
+Download the APK from the [latest release](https://github.com/Kouroshy85/Life-OS/releases/latest) and allow installing from unknown sources when Android asks. It needs Android 7 or newer. Data stays on each device, so the phone and PC don't share plans.
+
+On phones, the app has a side menu and a bottom bar for New goal, Home and Week. The weekly plan shows one day at a time, and Relax swaps the timer and music player in the centre of the screen. **Settings → Reduce animations and graphics** helps on older phones.
+
+To build it you need a JDK, the Android SDK and NDK, and `rustup target add aarch64-linux-android armv7-linux-androideabi`. Then run:
+
+```bash
+npm run tauri android build -- --apk
+```
+
+On Windows, Tauri creates a symbolic link during this build, which needs Developer Mode turned on. The result is unsigned, so sign it with your own key before installing.
+
+## License
+
+[MIT](LICENSE). Bundled fonts and libraries keep their own licences: see [third-party notices](THIRD_PARTY_NOTICES.md).

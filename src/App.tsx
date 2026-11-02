@@ -7,6 +7,7 @@ import { PlannerView } from "./features/planner/PlannerView";
 import { PlansView } from "./features/planner/PlansView";
 import { RelaxLauncher, RelaxMode } from "./features/relax/RelaxMode";
 import { SettingsView } from "./features/settings/SettingsView";
+import { DrawerButton, DrawerScrim, TabBar } from "./features/shell/MobileNav";
 import { Sidebar } from "./features/shell/Sidebar";
 import { ThemeScene } from "./features/shell/ThemeScene";
 import { ReminderDialog } from "./features/today/NotesDeck";
@@ -108,7 +109,9 @@ export default function App() {
       <Ambient />
       {/* Keyed so that switching language re-renders every screen with the new strings. */}
       <div className="app" key={lang}>
+        <DrawerScrim />
         <Sidebar />
+        <DrawerButton />
         <main className="main">
           {view === "today" && <TodayView />}
           {view === "week" && <WeekView />}
@@ -117,6 +120,7 @@ export default function App() {
           {view === "dreams" && <DreamsView />}
           {view === "settings" && <SettingsView />}
         </main>
+        <TabBar />
       </div>
       <GoalWizard />
       <RelaxLauncher />

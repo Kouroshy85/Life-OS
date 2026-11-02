@@ -1,0 +1,570 @@
+/* =========================================================================
+   Phone layout: side menu, bottom bar and pages fitted to a narrow screen
+   ========================================================================= */
+
+.drawer-btn,
+.drawer-scrim,
+.tabbar,
+.sidebar__close,
+.relax-swap {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  html,
+  body,
+  #root {
+    overscroll-behavior: none;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .main {
+    height: 100dvh;
+    scroll-behavior: auto;
+  }
+
+  .page {
+    padding: 74px 16px 108px;
+  }
+
+  .page-head {
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .page-head > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .page-title {
+    font-size: 34px;
+    margin-top: 6px;
+  }
+
+  .page-sub {
+    margin-top: 8px;
+    font-size: var(--fs-md);
+  }
+
+  .card {
+    padding: 18px 16px;
+  }
+
+  /* ---- side menu ---------------------------------------------------------------- */
+
+  .sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 55;
+    width: min(84vw, 320px);
+    height: 100dvh;
+    margin: 0;
+    padding: 16px 14px 18px;
+    align-items: stretch;
+    overflow-y: auto;
+    visibility: hidden;
+    transform: translateX(-104%);
+    transition: transform 380ms var(--ease), visibility 0s linear 380ms;
+  }
+
+  [dir="rtl"] .sidebar {
+    transform: translateX(104%);
+  }
+
+  .sidebar--open,
+  [dir="rtl"] .sidebar--open {
+    visibility: visible;
+    transform: none;
+    transition: transform 380ms var(--ease);
+  }
+
+  .sidebar__brand {
+    padding: 2px 4px 14px;
+  }
+
+  .sidebar__close {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-inline-start: auto;
+    border-radius: 50%;
+    color: var(--text-2);
+    background: rgb(var(--ink) / 0.07);
+  }
+
+  .sidebar__close:focus-visible {
+    border-radius: 50%;
+  }
+
+  .navitem {
+    height: 46px;
+  }
+
+  .navitem--small {
+    height: 44px;
+  }
+
+  .sidebar__new {
+    height: 46px;
+  }
+
+  .drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 54;
+    pointer-events: none;
+    opacity: 0;
+    background: rgb(var(--overlay-rgb) / 0.5);
+    transition: opacity 300ms var(--ease);
+  }
+
+  .drawer-scrim--on {
+    pointer-events: auto;
+    opacity: 1;
+  }
+
+  .drawer-btn {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    top: 14px;
+    inset-inline-start: 14px;
+    z-index: 30;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    color: var(--text);
+    --glass-tint: rgb(var(--glass-rgb) / 0.72);
+  }
+
+  .drawer-btn:focus-visible {
+    border-radius: 50%;
+  }
+
+  /* ---- bottom bar: a glass capsule holding three bubbles ------------------------- */
+
+  .tabbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    z-index: 30;
+    width: min(calc((100vw - 32px) * 0.8), 320px);
+    height: 66px;
+    padding: 6px;
+    transform: translateX(-50%);
+    direction: ltr;
+  }
+
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    border-radius: 27px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-2);
+    background: rgb(var(--ink) / 0.06);
+    box-shadow: inset 0 0.5px 0 rgb(var(--ink) / 0.16), inset 0 0 0 0.5px rgb(var(--ink) / 0.05);
+    transition:
+      transform 340ms var(--ease-spring),
+      color var(--dur-2) var(--ease),
+      background var(--dur-2) var(--ease),
+      box-shadow var(--dur-2) var(--ease);
+  }
+
+  .tab span {
+    max-width: 100%;
+    padding-inline: 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .tab:active {
+    transform: scale(0.94);
+  }
+
+  .tab:focus-visible {
+    border-radius: 27px;
+  }
+
+  /* The selected one swells into a brighter bubble, a little past the bar's edge. */
+  .tab--on,
+  .tab--on:active {
+    position: relative;
+    z-index: 1;
+    color: var(--text-on-accent);
+    transform: scale(1.13);
+    background:
+      radial-gradient(120% 70% at 50% 8%, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 62%),
+      linear-gradient(180deg, var(--violet-400), var(--violet-600));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -6px 10px -6px rgba(255, 255, 255, 0.3),
+      0 8px 22px -6px rgb(var(--a500) / 0.85);
+  }
+
+  /* ---- dialogs and menus: sheets from the bottom, big enough to tap --------------- */
+
+  .overlay {
+    place-items: end stretch;
+    padding: 0;
+  }
+
+  .dialog,
+  .dialog--wide {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 26px 26px 0 0 !important;
+    animation: sheet-up 340ms var(--ease);
+  }
+
+  .dialog__head {
+    padding: 22px 18px 8px;
+  }
+
+  @keyframes sheet-up {
+    from { transform: translateY(40%); opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
+
+  .menu__item {
+    height: 44px;
+  }
+
+  .toasts {
+    inset-inline: 16px;
+    bottom: 94px;
+    align-items: stretch;
+  }
+
+  .toast {
+    max-width: none;
+  }
+}
+
+/* =========================================================================
+   Reduced graphics: for older phones
+   ========================================================================= */
+
+.lite *,
+.lite *::before,
+.lite *::after {
+  animation: none !important;
+  transition: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+  scroll-behavior: auto !important;
+}
+
+.lite .ambient__orb,
+.lite .ambient__grain,
+.lite .scene-layer,
+.lite .relax__sky {
+  display: none;
+}
+
+.lite .glass {
+  background: rgb(var(--glass-strong-rgb));
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.lite .overlay {
+  background: rgb(var(--overlay-rgb) / 0.7);
+}
+
+/* ---- pages -------------------------------------------------------------------------- */
+
+@media (max-width: 820px) {
+  .today-grid,
+  .goals-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toasts {
+    bottom: 94px;
+  }
+
+  .week-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    height: auto;
+    padding: 8px 10px;
+  }
+
+  .wg-legend {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 820px) {
+  .page--week .toolbar {
+    position: static;
+  }
+
+  .toolbar {
+    top: 68px;
+  }
+
+  /* Relax: timer and player take turns in the centre, and the player peeks up from below. */
+  .relax__stage {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+  }
+
+  .relax__stage::after {
+    content: "";
+    flex: none;
+    height: 50dvh;
+  }
+
+  .relax-timer {
+    order: -1;
+    flex: none;
+    height: 100dvh;
+    gap: 12px;
+    /* Matches the pause button below the ring, so the ring itself sits dead centre. */
+    padding-top: 42px;
+    scroll-snap-align: center;
+  }
+
+  .relax__music {
+    flex: none;
+    margin-top: -172px;
+    padding-inline: 20px;
+    min-height: auto;
+    overflow: visible;
+    scroll-snap-align: center;
+  }
+
+  .relax-ring {
+    width: min(74vw, 40dvh);
+  }
+
+  .cd {
+    width: min(46vw, 22dvh);
+  }
+
+  /* Keeps the button and quote readable over whatever is scrolling behind them. */
+  .relax::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 2;
+    height: 112px;
+    pointer-events: none;
+    background: linear-gradient(to top, var(--relax-bg) 62%, transparent);
+  }
+
+  .relax-swap {
+    position: absolute;
+    bottom: 52px;
+    left: 50%;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 16px;
+    border-radius: var(--r-pill);
+    transform: translateX(-50%);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .relax-swap:focus-visible {
+    border-radius: var(--r-pill);
+  }
+
+  .relax__quote {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 3;
+    padding: 0 20px 14px;
+    font-size: 12.5px;
+  }
+
+}
+
+@media (max-width: 820px) {
+  /* Plan rows: details on top, colours and actions in a row beneath. */
+  .plan-row {
+    flex-wrap: wrap;
+  }
+
+  .plan-row__main {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .plan-row__actions {
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .color-swatch {
+    width: 28px;
+    height: 28px;
+  }
+
+  .color-pick {
+    gap: 10px;
+  }
+
+  .goal-hero__meta .color-field {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 820px) {
+  /* Weekly plan: one day, with the hours on the side the language reads from. */
+  .week-card {
+    padding: 12px;
+  }
+
+  .day-pill {
+    position: sticky;
+    top: 68px;
+    z-index: 8;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-height: 52px;
+    margin-bottom: 14px;
+    padding: 4px;
+    border-radius: var(--r-pill);
+    --glass-tint: rgb(var(--glass-strong-rgb) / 0.86);
+  }
+
+  .day-pill__label {
+    display: flex;
+    flex: 1;
+    align-items: baseline;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .day-pill__label strong {
+    font-size: var(--fs-md);
+    font-weight: 680;
+  }
+
+  .day-pill__label span {
+    font-size: 12.5px;
+    color: var(--text-2);
+  }
+
+  .day-pill__label em {
+    padding: 0 7px;
+    border-radius: var(--r-pill);
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 700;
+    color: var(--text-on-accent);
+    background: var(--violet-600);
+  }
+
+  .day-grid__body {
+    position: relative;
+  }
+
+  .day-grid--past .day-grid__track {
+    opacity: 0.6;
+  }
+
+  .day-grid__hour {
+    position: absolute;
+    inset-inline: 0;
+    height: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .day-grid__hour span {
+    position: absolute;
+    top: 3px;
+    inset-inline-start: 0;
+    width: 50px;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+
+  .day-grid__track {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 54px;
+    inset-inline-end: 0;
+  }
+
+  .day-grid__now {
+    position: absolute;
+    inset-inline: -54px 0;
+    z-index: 6;
+    height: 0;
+    border-top: 2px solid rgb(var(--now-rgb));
+    pointer-events: none;
+  }
+
+  .day-grid__now span {
+    position: absolute;
+    top: -9px;
+    inset-inline-start: 0;
+    padding: 0 4px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--on-now);
+    background: rgb(var(--now-2));
+  }
+
+  .day-grid__empty {
+    position: absolute;
+    top: 72px;
+    inset-inline: 54px 0;
+    font-size: 13px;
+    text-align: center;
+  }
+}

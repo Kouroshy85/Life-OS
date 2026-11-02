@@ -1,10 +1,10 @@
-import { Database, KeyRound, Keyboard, Languages, Moon, Quote, RotateCcw, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
+import { Database, Gauge, KeyRound, Keyboard, Languages, Moon, Quote, RotateCcw, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { aiConfigured, aiStatusLabel, testConnection } from "../../ai/planProvider";
 import { textProblem } from "../../domain/text";
 import { t } from "../../i18n";
 import { textErrorMessage } from "../planner/PlanWizard";
-import { addQuote, deleteQuote, hiddenQuotes, setHiddenQuotes, loadSampleData, removeSampleData, resetAll, saveAi, savePrefs, setLanguage, useApp, validatePrefs } from "../../state/store";
+import { addQuote, deleteQuote, hiddenQuotes, setHiddenQuotes, loadSampleData, removeSampleData, resetAll, saveAi, savePrefs, setLanguage, setLite, useApp, validatePrefs } from "../../state/store";
 import { SelectInput, TextInput, TimeInput } from "../../ui/fields";
 import { Button, Confirm, Field, IconButton, Segmented, Switch } from "../../ui/primitives";
 import { PrefsFields } from "../planner/PrefsForm";
@@ -16,6 +16,7 @@ export function SettingsView() {
   const engine = useApp((s) => s.engine);
   const location = useApp((s) => s.location);
   const lang = useApp((s) => s.lang);
+  const lite = useApp((s) => s.lite);
   const hasSample = useApp((s) => s.goals.some((g) => g.isSample) || s.tasks.some((t) => t.isSample) || s.commitments.some((c) => c.id.startsWith("sample-")));
 
   const [draft, setDraft] = useState(prefs);
@@ -59,6 +60,16 @@ export function SettingsView() {
       </section>
 
       <ThemeSection />
+
+      <section className="card settings-section rise" aria-labelledby="set-lite">
+        <h2 className="settings-section__title" id="set-lite">
+          <Gauge size={17} /> {t.liteTitle}
+        </h2>
+        <div className="settings-row">
+          <p className="field__hint">{t.liteHint}</p>
+          <Switch checked={lite} onChange={setLite} label={t.liteTitle} />
+        </div>
+      </section>
 
       <section className="card settings-section rise" aria-labelledby="set-plan">
         <h2 className="settings-section__title" id="set-plan">

@@ -70,6 +70,10 @@ interface AppState extends Snapshot {
   relaxClosing: boolean;
   lang: Lang;
   theme: ThemeId;
+  /** Fewer animations and effects, for older phones. */
+  lite: boolean;
+  /** The side menu on phones. */
+  drawerOpen: boolean;
 }
 
 const LANG_KEY = "life-os.lang";
@@ -87,6 +91,24 @@ function applyLang(lang: Lang) {
 }
 
 const THEME_KEY = "life-os.theme";
+const LITE_KEY = "life-os.lite";
+
+function applyLite(lite: boolean) {
+  document.documentElement.classList.toggle("lite", lite);
+  try {
+    localStorage.setItem(LITE_KEY, lite ? "1" : "0");
+  } catch {
+    // Only a first-paint convenience; the database holds the real setting.
+  }
+}
+
+function initialLite(): boolean {
+  try {
+    return localStorage.getItem(LITE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 /** Fills every colour token from a theme and tells the window whether it's light or dark. */
 function applyTheme(id: ThemeId) {
@@ -102,7 +124,9 @@ function applyTheme(id: ThemeId) {
   } catch {
     // Only a first-paint convenience; the database holds the real setting.
   }
-  if (isTauri()) {
+  const android = (window as { LifeOSAndroid?: { setBars(color: string, light: boolean): void } }).LifeOSAndroid;
+  if (android) android.setBars(theme.bg, theme.scheme === "light");
+  else if (isTauri()) {
     void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => getCurrentWindow().setTheme(theme.scheme)).catch(() => undefined);
   }
 }
@@ -187,6 +211,8 @@ export const useApp = create<AppState>(() => ({
   relaxClosing: false,
   lang: "en",
   theme: DEFAULT_THEME,
+  lite: false,
+  drawerOpen: false,
 }));
 
 if (typeof document !== "undefined") {
@@ -194,7 +220,9 @@ if (typeof document !== "undefined") {
   applyLang(lang);
   const theme = initialTheme();
   applyTheme(theme);
-  useApp.setState({ lang, theme });
+  const lite = initialLite();
+  applyLite(lite);
+  useApp.setState({ lang, theme, lite });
 }
 
 const set = useApp.setState;
@@ -249,7 +277,9 @@ async function open() {
     applyLang(lang);
     const theme = snap.flags.theme ? themeById(snap.flags.theme).id : get().theme;
     applyTheme(theme);
-    set({ ...snap, lang, theme, status: "ready", engine: repo.engine, location, clock: readClock() });
+    const lite = snap.flags.lite ? snap.flags.lite === "1" : get().lite;
+    applyLite(lite);
+    set({ ...snap, lang, theme, lite, status: "ready", engine: repo.engine, location, clock: readClock() });
   } catch (e) {
     set({ status: "error", fatal: e instanceof Error ? e.message : String(e) });
   }
@@ -310,7 +340,7 @@ export async function deleteDream(id: string) {
 
 // ---- relax
 
-export const openRelaxPicker = () => set({ relaxPickerOpen: true });
+export const openRelaxPicker = () => set({ relaxPickerOpen: true, drawerOpen: false });
 
 export function startRelax(title: string, minutes: number) {
   set({ relaxPickerOpen: false, relaxClosing: false, relaxSession: { title, minutes } });
@@ -379,11 +409,19 @@ export async function setTheme(id: ThemeId) {
   await mutate(() => R().setFlag("theme", id));
 }
 
-export const navigate = (view: View) => set({ view });
+export async function setLite(lite: boolean) {
+  applyLite(lite);
+  set({ lite });
+  await mutate(() => R().setFlag("lite", lite ? "1" : "0"));
+}
+
+export const setDrawerOpen = (drawerOpen: boolean) => set({ drawerOpen });
+
+export const navigate = (view: View) => set({ view, drawerOpen: false });
 export const selectGoal = (id: string | null) => set({ selectedGoalId: id, view: "goals" });
 export const setPlannerDate = (date: DateKey) => set({ plannerDate: date, plannerMode: "day" });
 export const setPlannerMode = (plannerMode: PlannerMode) => set({ plannerMode });
-export const openComposer = (open: boolean) => set({ composerOpen: open });
+export const openComposer = (open: boolean) => set({ composerOpen: open, drawerOpen: false });
 
 const planningState = () => {
   const s = get();
@@ -990,10 +1028,12 @@ export async function resetAll() {
   // The language is a device preference, not data, so it survives a reset.
   const lang = getLang();
   const theme = get().theme;
+  const lite = get().lite;
   await mutate(async () => {
     await R().resetAll();
     await R().setFlag("language", lang);
     await R().setFlag("theme", theme);
+    await R().setFlag("lite", lite ? "1" : "0");
   });
   await audioStore().clear();
   set({ selectedGoalId: null });

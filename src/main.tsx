@@ -11,6 +11,7 @@ import "./styles/views.css";
 import "./styles/plans.css";
 import "./styles/relax.css";
 import "./styles/scenes.css";
+import "./styles/phone.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
