@@ -119,6 +119,7 @@ export default function App() {
           {view === "planner" && (plannerMode === "plans" ? <PlansView /> : <PlannerView />)}
           {view === "dreams" && <DreamsView />}
           {view === "settings" && <SettingsView />}
+          <p className="credit">{t.madeBy}</p>
         </main>
         <TabBar />
       </div>

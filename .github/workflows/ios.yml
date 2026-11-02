@@ -1,0 +1,70 @@
+name: iOS build
+
+# Builds an unsigned IPA on a Mac runner. It can't go on an iPhone as it is:
+# sign it when installing, for example with Sideloadly and an Apple ID.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Add the iOS Rust target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add aarch64-apple-ios
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          brew install xcodegen
+
+      - name: Run tests
+        run: npm test
+
+      - name: Generate the iOS project
+        run: npx tauri ios init --ci
+
+      - name: Use the Life OS icon
+        run: npx tauri icon src-tauri/icons/icon.png
+
+      - name: Build
+        run: |
+          # Turns off signing for every Xcode step, since no Apple certificate is available here.
+          xcconfig="$RUNNER_TEMP/unsigned.xcconfig"
+          printf 'CODE_SIGNING_ALLOWED = NO\nCODE_SIGNING_REQUIRED = NO\nCODE_SIGN_IDENTITY =\nDEVELOPMENT_TEAM =\n' > "$xcconfig"
+          export XCODE_XCCONFIG_FILE="$xcconfig"
+          # The final export step needs a signature, so it's expected to fail. The archive before it is what's used.
+          npx tauri ios build --target aarch64 --ci || echo "tauri ios build exited with $?"
+
+      - name: Package the IPA
+        run: |
+          app="$(find src-tauri/gen/apple/build -type d -name '*.app' -path '*.xcarchive/Products/Applications/*' | head -n 1)"
+          if [ -z "$app" ]; then
+            echo "::error::No app was archived, so the build above really failed."
+            exit 1
+          fi
+          version="$(node -p "require('./package.json').version")"
+          mkdir Payload
+          cp -R "$app" Payload/
+          /usr/bin/zip -qry "Life-OS_${version}_ios-unsigned.ipa" Payload
+          ls -l ./*.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: life-os-ios
+          path: "*.ipa"
+          if-no-files-found: error
+          retention-days: 30

@@ -797,6 +797,7 @@ export const en = {
   quoteYours: "Yours",
   quoteDuplicate: "That quote is already on the list.",
   quotesRestore: "Bring back removed quotes",
+  madeBy: "Made by Kourosh Sabeti",
   // ---- phone
   menuOpen: "Open menu",
   menuClose: "Close menu",

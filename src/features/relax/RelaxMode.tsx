@@ -442,6 +442,7 @@ export function RelaxMode() {
           {quote}
         </p>
       )}
+      <p className="credit credit--relax">{t.madeBy}</p>
     </div>
   );
 }
