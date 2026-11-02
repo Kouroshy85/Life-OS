@@ -42,10 +42,28 @@ jobs:
 
       - name: Build
         run: |
-          # Turns off signing for every Xcode step, since no Apple certificate is available here.
-          xcconfig="$RUNNER_TEMP/unsigned.xcconfig"
-          printf 'CODE_SIGNING_ALLOWED = NO\nCODE_SIGNING_REQUIRED = NO\nCODE_SIGN_IDENTITY =\nDEVELOPMENT_TEAM =\n' > "$xcconfig"
-          export XCODE_XCCONFIG_FILE="$xcconfig"
+          # No Apple certificate is available here, and Xcode only honours "no signing" from its command line.
+          # Tauri runs xcodebuild itself, so a wrapper earlier on the PATH adds those settings.
+          mkdir -p "$RUNNER_TEMP/shim"
+          cat > "$RUNNER_TEMP/shim/xcodebuild" <<'EOF'
+          #!/bin/bash
+          args=()
+          building=no
+          for arg in "$@"; do
+            case "$arg" in
+              -allowProvisioningUpdates) continue ;;
+              archive|build) building=yes ;;
+            esac
+            args+=("$arg")
+          done
+          if [ "$building" = yes ]; then
+            args+=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM=)
+          fi
+          exec /usr/bin/xcodebuild "${args[@]}"
+          EOF
+          sed -i '' 's/^          //' "$RUNNER_TEMP/shim/xcodebuild"
+          chmod +x "$RUNNER_TEMP/shim/xcodebuild"
+          export PATH="$RUNNER_TEMP/shim:$PATH"
           # The final export step needs a signature, so it's expected to fail. The archive before it is what's used.
           npx tauri ios build --target aarch64 --ci || echo "tauri ios build exited with $?"
 
