@@ -119,6 +119,7 @@ function applyTheme(id: ThemeId) {
   root.classList.toggle("lit", theme.scheme === "light");
   root.style.colorScheme = theme.scheme;
   for (const [token, value] of Object.entries(themeTokens(theme))) root.style.setProperty(token, value);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme.bg);
   try {
     localStorage.setItem(THEME_KEY, theme.id);
   } catch {
@@ -416,6 +417,29 @@ export async function setLite(lite: boolean) {
 }
 
 export const setDrawerOpen = (drawerOpen: boolean) => set({ drawerOpen });
+
+/** Web app only: saves the database as a file the user keeps. */
+export async function downloadBackup() {
+  const { exportBrowserDatabase } = await import("../persistence/sqljsDriver");
+  const { backupFileName } = await import("../persistence/backup");
+  const bytes = await exportBrowserDatabase();
+  if (!bytes) return toast(t.backupEmpty, "error");
+  const url = URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "application/vnd.sqlite3" }));
+  const link = Object.assign(document.createElement("a"), { href: url, download: backupFileName(get().clock.today) });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  toast(t.backupSaved, "success");
+}
+
+/** Web app only: replaces everything with a backup file, then reopens the app on it. */
+export async function restoreBackup(bytes: Uint8Array) {
+  const { restoreBrowserDatabase } = await import("../persistence/sqljsDriver");
+  const result = await restoreBrowserDatabase(bytes);
+  if (result === "ok") location.reload();
+  else toast(result === "newer" ? t.backupNewer : t.backupBad, "error");
+}
 
 export const navigate = (view: View) => set({ view, drawerOpen: false });
 export const selectGoal = (id: string | null) => set({ selectedGoalId: id, view: "goals" });

@@ -1,7 +1,7 @@
 {
   "name": "life-os",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.5.0",
   "license": "MIT",
   "description": "Life OS — a local-first personal planning desktop app.",
   "type": "module",

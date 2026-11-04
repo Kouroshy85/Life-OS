@@ -1,14 +1,71 @@
-import { Database, Gauge, KeyRound, Keyboard, Languages, Moon, Quote, RotateCcw, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
+import { Database, Download, Gauge, KeyRound, Smartphone, Upload, Keyboard, Languages, Moon, Quote, RotateCcw, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { aiConfigured, aiStatusLabel, testConnection } from "../../ai/planProvider";
 import { textProblem } from "../../domain/text";
 import { t } from "../../i18n";
 import { textErrorMessage } from "../planner/PlanWizard";
-import { addQuote, deleteQuote, hiddenQuotes, setHiddenQuotes, loadSampleData, removeSampleData, resetAll, saveAi, savePrefs, setLanguage, setLite, useApp, validatePrefs } from "../../state/store";
+import { addQuote, deleteQuote, hiddenQuotes, setHiddenQuotes, loadSampleData, removeSampleData, resetAll, saveAi, savePrefs, setLanguage, setLite, downloadBackup, restoreBackup, useApp, validatePrefs } from "../../state/store";
 import { SelectInput, TextInput, TimeInput } from "../../ui/fields";
 import { Button, Confirm, Field, IconButton, Segmented, Switch } from "../../ui/primitives";
 import { PrefsFields } from "../planner/PrefsForm";
 import { ThemeSection } from "../shell/ThemeSwitcher";
+import { isTauri } from "../../persistence/driver";
+
+const installed = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
+
+function InstallSection() {
+  if (isTauri() || installed()) return null;
+  return (
+    <section className="card settings-section rise" aria-labelledby="set-install">
+      <h2 className="settings-section__title" id="set-install">
+        <Smartphone size={17} /> {t.installTitle}
+      </h2>
+      <p className="field__hint">{t.installWhy}</p>
+      <ul className="install-steps">
+        <li>{t.installIphone}</li>
+        <li>{t.installMac}</li>
+        <li>{t.installOther}</li>
+      </ul>
+    </section>
+  );
+}
+
+/** Web app only: keep a copy of everything, since browsers can clear a site's data. */
+function BackupButtons() {
+  const [pending, setPending] = useState<Uint8Array | null>(null);
+  if (isTauri()) return null;
+  return (
+    <>
+      <p className="field__hint">{t.backupHint}</p>
+      <div className="settings-section__foot" style={{ justifyContent: "flex-start" }}>
+        <Button variant="glass" icon={<Download size={15} />} onClick={downloadBackup}>
+          {t.backupDownload}
+        </Button>
+        <label className="btn btn--glass backup-pick">
+          <Upload size={15} />
+          {t.backupRestore}
+          <input
+            type="file"
+            className="sr-only"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) setPending(new Uint8Array(await file.arrayBuffer()));
+            }}
+          />
+        </label>
+      </div>
+      <Confirm
+        open={!!pending}
+        onClose={() => setPending(null)}
+        title={t.backupConfirmTitle}
+        message={t.backupConfirmMsg}
+        confirmLabel={t.backupRestore}
+        onConfirm={() => pending && restoreBackup(pending)}
+      />
+    </>
+  );
+}
 
 export function SettingsView() {
   const prefs = useApp((s) => s.prefs);
@@ -142,6 +199,8 @@ export function SettingsView() {
 
       <QuotesSection />
 
+      <InstallSection />
+
       <section className="card settings-section rise rise-2" aria-labelledby="set-data">
         <h2 className="settings-section__title" id="set-data">
           <Database size={17} /> {t.dataSection}
@@ -152,6 +211,7 @@ export function SettingsView() {
           <dt>{t.location}</dt>
           <dd className="kv__mono" dir="ltr">{location}</dd>
         </dl>
+        <BackupButtons />
         <div className="settings-section__foot" style={{ justifyContent: "flex-start" }}>
           {hasSample ? (
             <Button variant="glass" onClick={removeSampleData}>

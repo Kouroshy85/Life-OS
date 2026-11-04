@@ -1,4 +1,5 @@
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
+import { checkBackup, type BackupCheck } from "./backup";
 import type { SqlDriver, SqlParam, SqlStatement } from "./driver";
 
 /**
@@ -12,11 +13,12 @@ export function createSqlJsDriver(
 ): SqlDriver {
   let saving: Promise<void> = Promise.resolve();
   const persist = () => {
-    if (!opts.persist) return Promise.resolve();
+    if (!opts.persist || frozen) return Promise.resolve();
     const bytes = db.export();
     // export() reopens the database, which resets per-connection pragmas.
     db.run("PRAGMA foreign_keys = ON;");
     saving = saving.then(() => opts.persist!(bytes)).catch((e) => console.error("Persist failed", e));
+    lastSave = saving;
     return saving;
   };
   db.run("PRAGMA foreign_keys = ON;");
@@ -56,6 +58,9 @@ export function createSqlJsDriver(
 }
 
 let sqlPromise: Promise<SqlJsStatic> | null = null;
+let lastSave: Promise<void> = Promise.resolve();
+/** Set while a backup is being restored, so the open database can't save over it. */
+let frozen = false;
 
 const IDB_NAME = "life-os";
 const IDB_STORE = "files";
@@ -89,16 +94,36 @@ async function idbPut(bytes: Uint8Array): Promise<void> {
   });
 }
 
-export async function createBrowserDriver(): Promise<SqlDriver> {
+async function browserSql(): Promise<SqlJsStatic> {
   const wasmUrl = (await import("sql.js/dist/sql-wasm.wasm?url")).default;
   sqlPromise ??= initSqlJs({ locateFile: () => wasmUrl });
-  const SQL = await sqlPromise;
+  return sqlPromise;
+}
+
+/** The saved database file, once any save in progress has finished. */
+export async function exportBrowserDatabase(): Promise<Uint8Array | null> {
+  await lastSave;
+  return idbGet();
+}
+
+/** Checks a backup file and, if it's usable, makes it the saved database. The page must reload afterwards. */
+export async function restoreBrowserDatabase(bytes: Uint8Array): Promise<BackupCheck> {
+  const result = checkBackup(bytes, await browserSql());
+  if (result !== "ok") return result;
+  frozen = true;
+  await lastSave;
+  await idbPut(bytes);
+  return "ok";
+}
+
+export async function createBrowserDriver(): Promise<SqlDriver> {
+  const SQL = await browserSql();
   const existing = await idbGet().catch(() => null);
   const db = existing ? new SQL.Database(existing) : new SQL.Database();
   return createSqlJsDriver(db, {
     persist: idbPut,
-    engine: "SQLite (WebAssembly, browser preview)",
-    location: "Browser IndexedDB — run the desktop app for native storage",
+    engine: "SQLite (WebAssembly)",
+    location: "This browser (IndexedDB)",
   });
 }
 
