@@ -1888,3 +1888,21 @@ html[lang="fa"] .stat__value {
   justify-content: space-between;
   gap: 16px;
 }
+
+.install-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-inline-start: 18px;
+  list-style: disc;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.backup-pick {
+  cursor: pointer;
+}
+
+.backup-pick:focus-within {
+  box-shadow: var(--focus-ring);
+}

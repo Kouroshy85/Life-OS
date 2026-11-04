@@ -134,6 +134,14 @@ To add or change wording, edit `src/i18n/en.ts` and `src/i18n/fa.ts`. TypeScript
 | `Space` then `↑` / `↓` on a task handle | Reorder a task |
 | `Esc` | Close dialogs and menus |
 
+## Web app
+
+Open **https://kouroshy85.github.io/Life-OS/** in any modern browser. On iPhone, iPad and Mac, use Safari and add it to your Home Screen or Dock. It then opens like an app and works offline.
+
+The web app keeps your data in the browser that opened it, so it doesn't sync between devices or browsers. Browsers can clear a site's data, and Safari does so after 7 days without a visit for sites that aren't on the Home Screen, so use **Settings → Data → Download a backup** now and then. Backups don't include music files.
+
+The **Web app** workflow builds and publishes it to GitHub Pages whenever `main` changes. The build uses relative paths, so `dist` also runs from any folder on a web server.
+
 ## Android
 
 Download the APK from the [latest release](https://github.com/Kouroshy85/Life-OS/releases/latest) and allow installing from unknown sources when Android asks. It needs Android 7 or newer. Data stays on each device, so the phone and PC don't share plans.
