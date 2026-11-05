@@ -603,6 +603,50 @@ function goalTitle(text: string): string {
   return t[0].toUpperCase() + t.slice(1);
 }
 
+// ---- effort check -------------------------------------------------------------
+
+export interface EffortCheck {
+  notes: string[];
+  /** The target date if it's usable (after today), else null. */
+  target: DateKey | null;
+  /** Days the plan is spread over. */
+  spanDays: number;
+  /** True when the work can't fit before the target date at this many hours a week. */
+  tooMuch: boolean;
+}
+
+/** How long a plan takes at the given weekly hours, and whether it fits before the target date. */
+export function effortCheck(input: { totalMin: Minutes; hoursPerWeek: number; targetDate: DateKey | null; today: DateKey; fa: boolean }): EffortCheck {
+  const { totalMin, today, fa } = input;
+  const hoursPerWeek = Math.max(1, Math.min(80, input.hoursPerWeek || 5));
+  const notes: string[] = [];
+
+  let target = input.targetDate && isValidDateKey(input.targetDate) ? input.targetDate : null;
+  if (target && target <= today) {
+    notes.push(fa ? "تاریخی که زدی گذشته، پس ددلاین‌ها رو با وقت هفتگی‌ات تنظیم کردم." : "The target date is today or in the past, so deadlines are paced from your weekly hours instead.");
+    target = null;
+  }
+  const neededDays = Math.ceil((totalMin / 60 / hoursPerWeek) * 7);
+  const spanDays = target ? daysBetween(today, target) : Math.max(7, neededDays);
+
+  const weeks = Math.max(1, Math.round(neededDays / 7));
+  notes.push(
+    fa
+      ? toFaDigits(`حدود ${Math.round(totalMin / 60)} ساعت کار داره. با هفته‌ای ${hoursPerWeek} ساعت، حدوداً ${weeks} هفته طول می‌کشه.`)
+      : `Estimated effort ≈ ${Math.round(totalMin / 60)}h. At ${hoursPerWeek}h per week that takes about ${weeks} week${neededDays > 7 ? "s" : ""}.`,
+  );
+  const tooMuch = !!target && neededDays > spanDays;
+  if (tooMuch) {
+    notes.push(
+      fa
+        ? toFaDigits(`این بیشتر از ${spanDays} روزیه که تا تاریخ هدفت مونده. یا وقت هفتگی رو بیشتر کن، یا چند تا کار رو حذف کن، یا تاریخ رو عقب بنداز.`)
+        : `That is more than the ${spanDays} days until your target date — consider more hours per week, trimming tasks, or a later date.`,
+    );
+  }
+  if (!target) notes.push(fa ? "تاریخی نزدی، پس ددلاین مرحله‌ها رو با وقت هفتگی‌ات تنظیم کردم." : "No target date set — milestone deadlines are paced from your weekly hours.");
+  return { notes, target, spanDays, tooMuch };
+}
+
 // ---- compile -----------------------------------------------------------------
 
 export function compileGoal(req: GoalRequest): CompiledPlan {
@@ -619,31 +663,7 @@ export function compileGoal(req: GoalRequest): CompiledPlan {
     (sum, m) => sum + m.projects.reduce((s2, p) => s2 + p.tasks.reduce((s3, t) => s3 + t[1], 0), 0),
     0,
   );
-  const hoursPerWeek = Math.max(1, Math.min(80, req.hoursPerWeek || 5));
-  const notes: string[] = [];
-
-  let target = req.targetDate && isValidDateKey(req.targetDate) ? req.targetDate : null;
-  if (target && target <= req.today) {
-    notes.push(fa ? "تاریخی که زدی گذشته، پس ددلاین‌ها رو با وقت هفتگی‌ات تنظیم کردم." : "The target date is today or in the past, so deadlines are paced from your weekly hours instead.");
-    target = null;
-  }
-  const neededDays = Math.ceil((totalMin / 60 / hoursPerWeek) * 7);
-  const spanDays = target ? daysBetween(req.today, target) : Math.max(7, neededDays);
-
-  const weeks = Math.max(1, Math.round(neededDays / 7));
-  notes.push(
-    fa
-      ? toFaDigits(`حدود ${Math.round(totalMin / 60)} ساعت کار داره. با هفته‌ای ${hoursPerWeek} ساعت، حدوداً ${weeks} هفته طول می‌کشه.`)
-      : `Estimated effort ≈ ${Math.round(totalMin / 60)}h. At ${hoursPerWeek}h per week that takes about ${weeks} week${neededDays > 7 ? "s" : ""}.`,
-  );
-  if (target && neededDays > spanDays) {
-    notes.push(
-      fa
-        ? toFaDigits(`این بیشتر از ${spanDays} روزیه که تا تاریخ هدفت مونده. یا وقت هفتگی رو بیشتر کن، یا چند تا کار رو حذف کن، یا تاریخ رو عقب بنداز.`)
-        : `That is more than the ${spanDays} days until your target date — consider more hours per week, trimming tasks, or a later date.`,
-    );
-  }
-  if (!target) notes.push(fa ? "تاریخی نزدی، پس ددلاین مرحله‌ها رو با وقت هفتگی‌ات تنظیم کردم." : "No target date set — milestone deadlines are paced from your weekly hours.");
+  const { notes, target, spanDays } = effortCheck({ totalMin, hoursPerWeek: req.hoursPerWeek, targetDate: req.targetDate, today: req.today, fa });
 
   // Milestone deadlines are spread proportionally to their effort.
   let cumulative = 0;

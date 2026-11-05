@@ -1,9 +1,10 @@
-import { CalendarRange, LayoutGrid, Languages, Leaf, Moon, Plus, Settings2, Sun, Target, Wallet, X } from "lucide-react";
+import { Bot, CalendarRange, LayoutGrid, Languages, Leaf, Moon, Plus, Settings2, Sun, Target, Wallet, X } from "lucide-react";
 import { num } from "../../domain/locale";
 import { formatDuration } from "../../domain/time";
 import { t } from "../../i18n";
 import { navigate, openComposer, openRelaxPicker, setDrawerOpen, setLanguage, setPlannerMode, useApp, type View } from "../../state/store";
 import { LiquidGlass } from "../../ui/LiquidGlass";
+import { isTauri } from "../../persistence/driver";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
 const NAV: { view: View; label: () => string; icon: typeof Sun; key: string }[] = [
@@ -20,6 +21,7 @@ export function Sidebar() {
   const today = useApp((s) => s.clock.today);
   const lang = useApp((s) => s.lang);
   const drawerOpen = useApp((s) => s.drawerOpen);
+  const assistantOn = useApp((s) => s.flags["ai.enabled"] === "1") && isTauri();
   const todays = blocks.filter((b) => b.date === today && !b.proposed && b.kind === "task" && b.state !== "skipped");
   const done = todays.filter((b) => b.state === "done");
   const doneMin = done.reduce((s, b) => s + (b.end - b.start), 0);
@@ -94,6 +96,20 @@ export function Sidebar() {
             <span className="sidebar__label">{t.navDreams}</span>
           </button>
         </li>
+        {assistantOn && (
+          <li>
+            <button
+              type="button"
+              className={`navitem ${view === "assistant" ? "navitem--active" : ""}`}
+              aria-current={view === "assistant" ? "page" : undefined}
+              title={t.navAssistant}
+              onClick={() => navigate("assistant")}
+            >
+              <Bot size={18} strokeWidth={view === "assistant" ? 2.2 : 1.8} />
+              <span className="sidebar__label">{t.navAssistant}</span>
+            </button>
+          </li>
+        )}
       </ul>
 
       <div className="sidebar__spacer" />

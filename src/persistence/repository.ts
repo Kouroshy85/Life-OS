@@ -296,6 +296,62 @@ export function makeTask(partial: Partial<Task> & { title: string }): Task {
 
 // ---- snapshot ---------------------------------------------------------------------
 
+export type ChatRole = "user" | "assistant" | "note";
+export type ProposalStatus = "pending" | "applied" | "cancelled" | "failed" | "stale" | "interrupted";
+
+export interface Conversation {
+  id: string;
+  title: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One message in an assistant conversation. `proposal` holds a change set as plain JSON. */
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  role: ChatRole;
+  content: string;
+  intent: string | null;
+  model: string | null;
+  promptVersion: string | null;
+  proposal: unknown | null;
+  proposalStatus: ProposalStatus | null;
+  createdAt: string;
+}
+
+const conversationFrom = (r: Row): Conversation => ({
+  id: String(r.id),
+  title: String(r.title ?? ""),
+  archived: b(r.archived),
+  createdAt: String(r.created_at),
+  updatedAt: String(r.updated_at),
+});
+
+function messageFrom(r: Row): ChatMessage {
+  let proposal: unknown = null;
+  if (r.proposal != null) {
+    try {
+      proposal = JSON.parse(String(r.proposal));
+    } catch {
+      proposal = null;
+    }
+  }
+  return {
+    id: String(r.id),
+    conversationId: String(r.conversation_id),
+    role: r.role as ChatRole,
+    content: String(r.content),
+    intent: s(r.intent),
+    model: s(r.model),
+    promptVersion: s(r.prompt_version),
+    proposal,
+    proposalStatus: (s(r.proposal_status) as ProposalStatus | null) ?? null,
+    createdAt: String(r.created_at),
+  };
+}
+
 export interface AiSettings {
   provider: "none" | "anthropic";
   apiKey: string;
@@ -454,6 +510,13 @@ export class Repository {
 
   /** Inserts a compiled plan as a new goal. Returns the goal id. */
   async createGoalFromPlan(plan: CompiledPlan, opts: { isSample?: boolean; sortOrder?: number } = {}): Promise<string> {
+    const { goalId, statements } = this.goalPlanStatements(plan, opts);
+    await this.db.batch(statements);
+    return goalId;
+  }
+
+  /** The statements that insert a compiled plan as a new goal, so callers can add more to the same transaction. */
+  goalPlanStatements(plan: CompiledPlan, opts: { isSample?: boolean; sortOrder?: number } = {}): { goalId: string; statements: SqlStatement[] } {
     const ts = nowIso();
     const goalId = newId();
     const sample = bool(!!opts.isSample);
@@ -510,8 +573,7 @@ export class Repository {
         }
       });
     });
-    await this.db.batch(stmts);
-    return goalId;
+    return { goalId, statements: stmts };
   }
 
   async updateGoal(id: string, patch: Partial<Pick<Goal, "title" | "description" | "targetDate" | "archived" | "sortOrder" | "color">>) {
@@ -640,7 +702,35 @@ export class Repository {
     await this.db.execute("DELETE FROM projects WHERE id = ?", [id]);
   }
 
+  /** A milestone with its default project, as statements. */
+  milestoneStatements(m: { goalId: string; title: string; description: string; deadline: DateKey | null; sortOrder: number }): {
+    milestoneId: string;
+    projectId: string;
+    statements: SqlStatement[];
+  } {
+    const ts = nowIso();
+    const milestoneId = newId();
+    const projectId = newId();
+    return {
+      milestoneId,
+      projectId,
+      statements: [
+        insert("milestones", { id: milestoneId, goal_id: m.goalId, title: m.title, description: m.description, deadline: m.deadline, sort_order: m.sortOrder, created_at: ts }),
+        insert("projects", { id: projectId, milestone_id: milestoneId, title: "Tasks", sort_order: 0, created_at: ts }),
+      ],
+    };
+  }
+
+  projectStatement(p: { milestoneId: string; title: string; sortOrder: number }): { projectId: string; statement: SqlStatement } {
+    const projectId = newId();
+    return { projectId, statement: insert("projects", { id: projectId, milestone_id: p.milestoneId, title: p.title, sort_order: p.sortOrder, created_at: nowIso() }) };
+  }
+
   // ---- tasks ---------------------------------------------------------------------------
+
+  taskInsert(task: Task): SqlStatement {
+    return insert("tasks", taskRow(task));
+  }
 
   async createTask(task: Task) {
     const st = insert("tasks", taskRow(task));
@@ -831,9 +921,60 @@ export class Repository {
     ]);
   }
 
+  // ---- assistant conversations ---------------------------------------------------------
+
+  /** The newest conversation that hasn't been cleared, with its messages, or null. */
+  async loadConversation(): Promise<{ conversation: Conversation; messages: ChatMessage[] } | null> {
+    const rows = await this.db.select<Row>("SELECT * FROM ai_conversations WHERE archived = 0 ORDER BY updated_at DESC LIMIT 1");
+    if (!rows.length) return null;
+    const conversation = conversationFrom(rows[0]);
+    const messages = await this.db.select<Row>("SELECT * FROM ai_messages WHERE conversation_id = ? ORDER BY created_at, rowid", [conversation.id]);
+    return { conversation, messages: messages.map(messageFrom) };
+  }
+
+  async createConversation(title = ""): Promise<Conversation> {
+    const ts = nowIso();
+    const conversation: Conversation = { id: newId(), title, archived: false, createdAt: ts, updatedAt: ts };
+    await this.db.execute("INSERT INTO ai_conversations (id, title, archived, created_at, updated_at) VALUES (?, ?, 0, ?, ?)", [
+      conversation.id,
+      title,
+      ts,
+      ts,
+    ]);
+    return conversation;
+  }
+
+  async saveMessage(m: ChatMessage) {
+    await this.db.batch([
+      {
+        sql: `INSERT INTO ai_messages (id, conversation_id, role, content, intent, model, prompt_version, proposal, proposal_status, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(id) DO UPDATE SET content = excluded.content, intent = excluded.intent, model = excluded.model,
+                prompt_version = excluded.prompt_version, proposal = excluded.proposal, proposal_status = excluded.proposal_status`,
+        params: [
+          m.id,
+          m.conversationId,
+          m.role,
+          m.content,
+          m.intent,
+          m.model,
+          m.promptVersion,
+          m.proposal == null ? null : JSON.stringify(m.proposal),
+          m.proposalStatus,
+          m.createdAt,
+        ],
+      },
+      { sql: "UPDATE ai_conversations SET updated_at = ? WHERE id = ?", params: [nowIso(), m.conversationId] },
+    ]);
+  }
+
+  async archiveConversation(id: string) {
+    await this.db.execute("UPDATE ai_conversations SET archived = 1, updated_at = ? WHERE id = ?", [nowIso(), id]);
+  }
+
   async resetAll() {
     await this.db.batch(
-      ["task_events", "day_skips", "day_plans", "schedule_blocks", "plans", "notes", "dreams", "songs", "playlists", "quotes", "tasks", "projects", "milestones", "goals", "settings"].map(
+      ["ai_messages", "ai_conversations", "task_events", "day_skips", "day_plans", "schedule_blocks", "plans", "notes", "dreams", "songs", "playlists", "quotes", "tasks", "projects", "milestones", "goals", "settings"].map(
         (t) => ({ sql: `DELETE FROM ${t}` }),
       ),
     );

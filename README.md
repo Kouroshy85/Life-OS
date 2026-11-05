@@ -134,6 +134,10 @@ To add or change wording, edit `src/i18n/en.ts` and `src/i18n/fa.ts`. TypeScript
 | `Space` then `↑` / `↓` on a task handle | Reorder a task |
 | `Esc` | Close dialogs and menus |
 
+## Local AI assistant (optional)
+
+Turn it on in **Settings → AI assistant**. It's a planning chat that runs entirely on your computer with a local model (Qwen3.5), with no account and no internet once the model is installed. It proposes goals, tasks and weekly plans, and Life OS's own planner decides the times. Nothing is saved until you press Apply. The model file is downloaded separately, not bundled. Details are in [docs/local-ai.md](docs/local-ai.md).
+
 ## Web app
 
 Open **https://kouroshy85.github.io/Life-OS/** in any modern browser. On iPhone, iPad and Mac, use Safari and add it to your Home Screen or Dock. It then opens like an app and works offline.

@@ -1,4 +1,4 @@
-import { useEffect, useState, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useEffect, useState, type InputHTMLAttributes, type Ref, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { num, toLatinDigits } from "../domain/locale";
 import { digitsOnly, timeChars } from "../domain/text";
 import { formatClock, parseClock } from "../domain/time";
@@ -11,7 +11,7 @@ export function TextInput({ className = "", ...rest }: InputHTMLAttributes<HTMLI
   return <input id={id} dir="auto" className={`input ${className}`} {...rest} />;
 }
 
-export function TextArea({ className = "", ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function TextArea({ className = "", ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) {
   const id = useFieldId();
   return <textarea id={id} dir="auto" className={`textarea ${className}`} {...rest} />;
 }
