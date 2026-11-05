@@ -9,6 +9,8 @@ import { getLang, setLang, weekStartDay, type Lang } from "../domain/locale";
 import { dayBit, weekDates } from "../domain/plans";
 import { hasLetters } from "../domain/text";
 import { DEFAULT_THEME, themeById, themeTokens, type ThemeId } from "../domain/themes";
+import { changeSetStatements, type AppliedCounts } from "../ai/assistant/apply";
+import { buildChangeSet, isStale, type ChangeSet, type ProposalState } from "../ai/assistant/proposals";
 import type { PlanColor } from "../domain/types";
 import { dateTimeKey, formatClock, formatDuration, minutesOfDay, toDateKey } from "../domain/time";
 import { explain, t } from "../i18n";
@@ -42,7 +44,7 @@ import {
   type Clock,
 } from "./planning";
 
-export type View = "today" | "week" | "goals" | "planner" | "dreams" | "settings";
+export type View = "today" | "week" | "goals" | "planner" | "dreams" | "settings" | "assistant";
 export type PlannerMode = "plans" | "day";
 
 export interface Toast {
@@ -442,6 +444,51 @@ export async function restoreBackup(bytes: Uint8Array) {
 }
 
 export const navigate = (view: View) => set({ view, drawerOpen: false });
+
+// ---- local assistant ----------------------------------------------------------------------
+
+/** The repository, for the assistant's conversation storage. */
+export const repository = () => R();
+
+/** Everything a change set is built from and checked against. */
+export function proposalState(): ProposalState {
+  const s = get();
+  return { goals: s.goals, milestones: s.milestones, projects: s.projects, tasks: s.tasks, plans: s.plans, blocks: s.blocks, commitments: s.commitments, skips: s.skips, prefs: s.prefs };
+}
+
+export type ApplyOutcome =
+  | { status: "applied"; counts: AppliedCounts }
+  | { status: "stale"; changeSet: ChangeSet }
+  | { status: "failed"; message: string };
+
+/**
+ * Saves an approved change set in one transaction. If the data changed since the
+ * preview was made, nothing is saved and a fresh preview comes back instead.
+ */
+export async function applyAssistantChangeSet(cs: ChangeSet): Promise<ApplyOutcome> {
+  const s = get();
+  const state = proposalState();
+  if (isStale(cs, state)) {
+    return { status: "stale", changeSet: buildChangeSet(cs.operations, state, s.clock, { summary: cs.summary, model: cs.model }) };
+  }
+  try {
+    const r = R();
+    const { statements, counts } = changeSetStatements(r, cs, state, s.clock.today);
+    await r.run(statements);
+    await refresh();
+    return { status: "applied", counts };
+  } catch (e) {
+    await refresh().catch(() => undefined);
+    return { status: "failed", message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function setAssistantEnabled(enabled: boolean) {
+  await mutate(() => R().setFlag("ai.enabled", enabled ? "1" : "0"));
+  if (!enabled && get().view === "assistant") set({ view: "today" });
+}
+
+export const setAssistantModel = (modelId: string) => mutate(() => R().setFlag("ai.model", modelId));
 export const selectGoal = (id: string | null) => set({ selectedGoalId: id, view: "goals" });
 export const setPlannerDate = (date: DateKey) => set({ plannerDate: date, plannerMode: "day" });
 export const setPlannerMode = (plannerMode: PlannerMode) => set({ plannerMode });

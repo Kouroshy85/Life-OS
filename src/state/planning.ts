@@ -334,3 +334,84 @@ export function earliestSlot(state: PlanningState, task: Task, date: DateKey, cl
   });
   return result;
 }
+
+// ---- weekly proposals -------------------------------------------------------------
+
+export type TimeOfDay = "any" | "morning" | "afternoon" | "evening" | "focus";
+
+/** Narrows the working hours to a part of the day, without ever widening them past sleep. */
+export function prefsForTimeOfDay(prefs: Preferences, when: TimeOfDay): Preferences {
+  const ranges: Record<Exclude<TimeOfDay, "any">, [Minutes, Minutes]> = {
+    morning: [Math.min(prefs.workStart, 8 * 60), 12 * 60],
+    afternoon: [12 * 60, 17 * 60],
+    evening: [17 * 60, 21 * 60 + 30],
+    focus: [prefs.focusStart, prefs.focusEnd],
+  };
+  if (when === "any") return prefs;
+  const [start, end] = ranges[when];
+  return { ...prefs, workStart: start, workEnd: Math.max(start + 30, end) };
+}
+
+export interface WeekDayProposal {
+  date: DateKey;
+  blocks: ScheduleBlock[];
+}
+
+export interface WeekProposal {
+  days: WeekDayProposal[];
+  /** Tasks with time still unplaced after every day was tried, with the scheduler's reason from the last day. */
+  unscheduled: UnscheduledNote[];
+}
+
+/**
+ * Places the given tasks into the free time of several days, one day after another.
+ * Existing live blocks are all treated as busy, so nothing already planned moves:
+ * this only adds sessions around what's there. Each day sees the sessions placed on
+ * earlier days, so a task's time isn't planned twice.
+ */
+export function proposeWeek(
+  state: PlanningState,
+  dates: DateKey[],
+  clock: Clock,
+  opts: { taskIds: string[]; timeOfDay?: TimeOfDay },
+): WeekProposal {
+  const ids = new Set(opts.taskIds);
+  let sim: PlanningState = state;
+  const days: WeekDayProposal[] = [];
+  let lastNotes = new Map<string, UnscheduledNote>();
+  const prefs = prefsForTimeOfDay(state.prefs, opts.timeOfDay ?? "any");
+
+  for (const date of dates) {
+    if (date < clock.today) continue;
+    const tasks = sim.tasks.filter((t) => ids.has(t.id) && isOpen(t)).filter((t) => unplannedMinutes(sim, t, date, clock) > 0);
+    if (!tasks.length) break;
+    const busy = busyFor(sim, date, clock);
+    for (const b of liveBlocks(sim, date)) {
+      if (b.state === "planned" && !isKept(b, date, clock)) busy.push({ start: b.start, end: b.end, title: "", kind: "task", taskId: b.taskId, state: b.state });
+    }
+    const result = schedule({
+      date,
+      today: clock.today,
+      nowMin: clock.nowMin,
+      prefs,
+      busy,
+      // Only what has no session anywhere yet, today included, so nothing is planned twice.
+      tasks: tasks.map((t) => ({ ...toSchedulable(t), progressMin: t.estimateMin - unplannedMinutes(sim, t, date, clock) })),
+      skippedToday: sim.skips[date] ?? [],
+    });
+    const blocks = toBlocks(date, result.blocks, false);
+    lastNotes = new Map(result.unscheduled.map((n) => [n.taskId, n]));
+    if (blocks.some((b) => b.kind === "task")) {
+      days.push({ date, blocks });
+      sim = { ...sim, blocks: [...sim.blocks, ...blocks] };
+    }
+  }
+
+  const unscheduled: UnscheduledNote[] = [];
+  for (const task of sim.tasks.filter((t) => ids.has(t.id) && isOpen(t))) {
+    const last = dates[dates.length - 1];
+    const remaining = last ? unplannedMinutes(sim, task, last, clock) : 0;
+    if (remaining > 0) unscheduled.push(lastNotes.get(task.id) ?? { taskId: task.id, reason: "no_time", message: "", remainingMin: remaining });
+  }
+  return { days, unscheduled };
+}

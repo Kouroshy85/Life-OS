@@ -9,6 +9,7 @@ import { SelectInput, TextInput, TimeInput } from "../../ui/fields";
 import { Button, Confirm, Field, IconButton, Segmented, Switch } from "../../ui/primitives";
 import { PrefsFields } from "../planner/PrefsForm";
 import { ThemeSection } from "../shell/ThemeSwitcher";
+import { AssistantSettings } from "../assistant/AssistantSettings";
 import { isTauri } from "../../persistence/driver";
 
 const installed = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
@@ -127,6 +128,8 @@ export function SettingsView() {
           <Switch checked={lite} onChange={setLite} label={t.liteTitle} />
         </div>
       </section>
+
+      <AssistantSettings />
 
       <section className="card settings-section rise" aria-labelledby="set-plan">
         <h2 className="settings-section__title" id="set-plan">

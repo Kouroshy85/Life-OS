@@ -81,6 +81,48 @@ describe("plan and goal colours", () => {
   });
 });
 
+describe("assistant conversations", () => {
+  it("saves messages and proposals, and reloads the newest open conversation", async () => {
+    const c = await repo.createConversation("Week");
+    const base = { conversationId: c.id, intent: null, model: null, promptVersion: null, proposal: null, proposalStatus: null };
+    await repo.saveMessage({ ...base, id: "m1", role: "user", content: "Plan my week", createdAt: "2026-11-05T08:00:00Z" });
+    await repo.saveMessage({ ...base, id: "m2", role: "assistant", content: "Here's a plan", intent: "propose_changes", model: "Qwen3.5-2B", promptVersion: "1", proposal: { summary: "s" }, proposalStatus: "pending", createdAt: "2026-11-05T08:00:01Z" });
+    await repo.saveMessage({ ...base, id: "m2", role: "assistant", content: "Here's a plan", intent: "propose_changes", model: "Qwen3.5-2B", promptVersion: "1", proposal: { summary: "s" }, proposalStatus: "applied", createdAt: "2026-11-05T08:00:01Z" });
+    const loaded = await repo.loadConversation();
+    expect(loaded?.conversation.id).toBe(c.id);
+    expect(loaded?.messages.map((m) => [m.id, m.proposalStatus])).toEqual([["m1", null], ["m2", "applied"]]);
+    expect(loaded?.messages[1].proposal).toEqual({ summary: "s" });
+  });
+
+  it("clears a conversation without touching plans, and deleting everything removes chats too", async () => {
+    const c = await repo.createConversation();
+    await repo.saveMessage({ id: "x", conversationId: c.id, role: "user", content: "hi", intent: null, model: null, promptVersion: null, proposal: null, proposalStatus: null, createdAt: "" });
+    await repo.archiveConversation(c.id);
+    expect(await repo.loadConversation()).toBeNull();
+    await repo.createConversation();
+    await repo.resetAll();
+    expect(await repo.loadConversation()).toBeNull();
+  });
+
+  it("refuses a proposal status it doesn't know", async () => {
+    const c = await repo.createConversation();
+    await expect(
+      repo.saveMessage({ id: "y", conversationId: c.id, role: "assistant", content: "x", intent: null, model: null, promptVersion: null, proposal: null, proposalStatus: "done" as never, createdAt: "" }),
+    ).rejects.toThrow();
+  });
+
+  it("upgrades a version 4 database and keeps its data", async () => {
+    const old = await createMemoryDriver();
+    for (const m of MIGRATIONS.filter((x) => x.version <= 4)) await old.batch(m.statements.map((sql) => ({ sql })));
+    await old.execute("PRAGMA user_version = 4");
+    await old.execute("INSERT INTO goals (id, title, created_at, updated_at) VALUES ('g', 'Keep me', 'x', 'x')");
+    expect(await migrate(old)).toEqual({ from: 4, to: LATEST_VERSION });
+    const r = new Repository(old);
+    expect((await r.loadSnapshot()).goals[0].title).toBe("Keep me");
+    expect(await r.loadConversation()).toBeNull();
+  });
+});
+
 describe("dreams, music and quotes", () => {
   it("saves and edits dreams, newest first", async () => {
     await repo.saveDream({ id: "a", title: "See Japan", body: "Spring", createdAt: "2026-01-01" });

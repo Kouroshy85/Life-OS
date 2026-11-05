@@ -1,6 +1,6 @@
 [package]
 name = "life-os"
-version = "1.5.0"
+version = "1.6.0"
 license = "MIT"
 description = "Life OS — local-first personal planning"
 edition = "2021"
@@ -17,6 +17,16 @@ tauri = { version = "2", features = ["protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.41", features = ["bundled"] }
+
+# The local AI assistant runs on desktop only, so Android and iOS builds never compile llama.cpp.
+# llama-cpp-2 0.1.161 bundles llama.cpp b11429, which reads Qwen3.5 (`qwen35`, added in b8233).
+# Building it needs libclang for bindgen (LLVM, found through LIBCLANG_PATH) and CMake.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+llama-cpp-2 = { version = "=0.1.161", default-features = false, features = ["common"] }
+sysinfo = { version = "0.40", default-features = false, features = ["system"] }
+sha2 = "0.11"
+reqwest = { version = "0.13", default-features = false, features = ["native-tls", "http2", "system-proxy", "stream"] }
+tauri-plugin-dialog = "2"
 
 [profile.release]
 codegen-units = 1

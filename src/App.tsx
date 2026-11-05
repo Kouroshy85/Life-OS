@@ -1,5 +1,6 @@
 import { CircleAlert } from "lucide-react";
 import { useEffect } from "react";
+import { AssistantView } from "./features/assistant/AssistantView";
 import { DreamsView } from "./features/dreams/DreamsView";
 import { GoalsView } from "./features/goals/GoalsView";
 import { GoalWizard } from "./features/goals/GoalWizard";
@@ -119,6 +120,7 @@ export default function App() {
           {view === "planner" && (plannerMode === "plans" ? <PlansView /> : <PlannerView />)}
           {view === "dreams" && <DreamsView />}
           {view === "settings" && <SettingsView />}
+          {view === "assistant" && <AssistantView />}
           <p className="credit">{t.madeBy}</p>
         </main>
         <TabBar />
