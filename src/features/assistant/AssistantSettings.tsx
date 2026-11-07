@@ -52,11 +52,13 @@ export function AssistantSettings() {
             {models.map((m) => {
               const on = m.id === chosen;
               const pct = download?.modelId === m.id && download.total ? Math.round((download.received / download.total) * 100) : null;
+              const hint = m.id === "qwen3.5-2b-q4_k_m" ? t.aiModelHintFast : m.id === "qwen3.5-4b-q4_k_m" ? t.aiModelHintSmart : null;
               return (
                 <div key={m.id} className={`ai-model ${on ? "ai-model--on" : ""}`}>
                   <button type="button" role="radio" aria-checked={on} className="ai-model__pick" onClick={() => void setAssistantModel(m.id)}>
                     <strong>{m.name}</strong>
                     <span className="faint tabular">{t.aiModelSize(num(gb(m.sizeBytes)), num(Math.round(m.minRamMb / 1024)))}</span>
+                    {hint && <span className="faint">{hint}</span>}
                     <span className="faint">{t.aiLicence(m.licence)}</span>
                   </button>
                   <div className="ai-model__actions">

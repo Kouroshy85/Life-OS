@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import { buildChangeSet, type ChangeSet } from "../ai/assistant/proposals";
 import { classifyRequest, type ContextSource, type RequestKind } from "../ai/assistant/context";
+import { confirmationIntent } from "../ai/assistant/confirm";
 import { runTurn } from "../ai/assistant/conversation";
 import type { ResolvedOperation } from "../ai/assistant/parse";
 import { encodeNote, messageText, type AppNote } from "../ai/assistant/messages";
@@ -33,6 +34,8 @@ interface AssistantState {
   models: ModelInfo[];
   download: { modelId: string; received: number; total: number } | null;
   modelBusy: boolean;
+  /** Tap-to-answer buttons under the latest reply. Kept only for the latest one, and not saved. */
+  choices: { messageId: string; items: string[] } | null;
 }
 
 export const useAssistant = create<AssistantState>(() => ({
@@ -45,6 +48,7 @@ export const useAssistant = create<AssistantState>(() => ({
   models: [],
   download: null,
   modelBusy: false,
+  choices: null,
 }));
 
 const set = useAssistant.setState;
@@ -142,9 +146,22 @@ export function providerErrorText(e: ProviderError): string {
   }
 }
 
+/** The newest proposal still waiting for a yes or no. */
+const pendingProposal = () => [...get().messages].reverse().find((m) => m.role === "assistant" && m.proposalStatus === "pending");
+
 export async function sendMessage(text: string, kind?: RequestKind) {
   const clean = text.trim();
   if (!clean || get().busy) return;
+  set({ choices: null });
+  // A plain "yes" or "no" to a waiting proposal is handled here, instantly, without the model.
+  const pending = pendingProposal();
+  const answer = pending ? confirmationIntent(clean) : null;
+  if (pending && answer) {
+    await save(message("user", clean));
+    if (answer === "yes") await applyProposal(pending.id);
+    else await cancelProposal(pending.id);
+    return;
+  }
   if (!get().conversationId) {
     const conversation = await repository().createConversation(clean.slice(0, 60));
     set({ conversationId: conversation.id, messages: [] });
@@ -193,7 +210,8 @@ export async function sendMessage(text: string, kind?: RequestKind) {
   if (result.status === "ok") {
     const { response } = result;
     let content = response.reply;
-    if (response.needs_clarification && response.clarification && !content.includes(response.clarification)) content += `\n\n${response.clarification}`;
+    // The question is usually the reply itself; add it only when the reply doesn't already ask something.
+    if (response.needs_clarification && response.clarification && !content.includes(response.clarification) && !/[?؟]/.test(content)) content += `\n\n${response.clarification}`;
     let proposal: ChangeSet | null = null;
     if (result.operations.length || result.rejected.length) {
       const s = useApp.getState();
@@ -204,7 +222,11 @@ export async function sendMessage(text: string, kind?: RequestKind) {
       });
     }
     const hasItems = !!proposal?.items.length;
-    await save(message("assistant", content, { ...meta, intent: response.intent, proposal, proposalStatus: hasItems ? "pending" : null }));
+    // A new proposal replaces any earlier one that was never answered.
+    if (hasItems) for (const m of get().messages) if (m.proposalStatus === "pending") await setStatus(m.id, "cancelled");
+    const saved = message("assistant", content, { ...meta, intent: response.intent, proposal, proposalStatus: hasItems ? "pending" : null });
+    await save(saved);
+    if (!hasItems && response.choices.length) set({ choices: { messageId: saved.id, items: response.choices } });
   } else if (result.status === "cancelled") {
     await save(message("assistant", result.partial || encodeNote({ k: "stopped" }), { ...meta, proposalStatus: "interrupted" }));
   } else if (result.status === "invalid") {
@@ -224,7 +246,7 @@ export async function clearConversation() {
   stopGenerating();
   const id = get().conversationId;
   if (id) await repository().archiveConversation(id);
-  set({ conversationId: null, messages: [], streaming: null, busy: false });
+  set({ conversationId: null, messages: [], streaming: null, busy: false, choices: null });
 }
 
 async function setStatus(id: string, status: ProposalStatus, proposal?: ChangeSet) {

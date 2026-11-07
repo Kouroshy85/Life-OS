@@ -81,6 +81,7 @@ export function answer(overrides: Partial<AssistantResponse> = {}): string {
     reply: "Here's an idea.",
     needs_clarification: false,
     clarification: null,
+    choices: [],
     proposal: null,
     operations: [],
     ...overrides,

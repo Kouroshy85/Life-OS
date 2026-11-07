@@ -477,3 +477,34 @@
     align-items: stretch;
   }
 }
+
+/* Tap-to-answer buttons the assistant offers under its latest reply. */
+.ai-choices {
+  margin-top: 8px;
+}
+
+.proposal__touches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--warning-ink);
+}
+
+.proposal__details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: var(--fs-sm);
+}
+
+.proposal__details > summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.proposal__details[open] > summary {
+  margin-bottom: 8px;
+}

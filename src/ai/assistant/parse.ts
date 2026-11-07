@@ -47,7 +47,8 @@ export type RejectionCode =
   | "after_target"
   | "nothing_to_plan"
   | "no_milestone"
-  | "invalid_task";
+  | "invalid_task"
+  | "duplicate";
 
 export interface Rejection {
   type: string;

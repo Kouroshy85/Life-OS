@@ -164,13 +164,15 @@ function Messages() {
   const messages = useAssistant((s) => s.messages);
   const streaming = useAssistant((s) => s.streaming);
   const modelBusy = useAssistant((s) => s.modelBusy);
+  const choices = useAssistant((s) => s.choices);
+  const busy = useAssistant((s) => s.busy);
   const list = useRef<HTMLDivElement>(null);
 
   // Only the message list scrolls; keep it at the newest message.
   useLayoutEffect(() => {
     const el = list.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, streaming]);
+  }, [messages.length, streaming, choices]);
 
   if (!messages.length && streaming == null) {
     return <Empty icon={<Bot size={22} />} title={t.aiEmptyTitle} text={t.aiEmptyText} />;
@@ -188,6 +190,15 @@ function Messages() {
             </div>
             {m.proposalStatus === "interrupted" && <span className="chip ai-msg__tag">{t.aiInterrupted}</span>}
             {m.role === "assistant" && m.proposal != null && <ProposalCard msg={m} />}
+            {choices?.messageId === m.id && streaming == null && (
+              <div className="ai-quick ai-choices" role="group" aria-label={t.aiChoicesLabel}>
+                {choices.items.map((c) => (
+                  <button key={c} type="button" className="chip ai-quick__chip" dir="auto" disabled={busy} onClick={() => void sendMessage(c)}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ),
       )}

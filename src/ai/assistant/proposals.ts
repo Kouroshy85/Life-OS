@@ -57,6 +57,35 @@ export interface ChangeSet {
   model: string | null;
 }
 
+export interface ChangeCounts {
+  goals: string[];
+  milestones: number;
+  tasks: number;
+  updated: number;
+  sessions: number;
+  rescheduled: number;
+}
+
+/** What applying a change set would add or change, counted the way the "saved" note counts it. */
+export function changeCounts(cs: ChangeSet): ChangeCounts {
+  const c: ChangeCounts = { goals: [], milestones: 0, tasks: 0, updated: 0, sessions: 0, rescheduled: 0 };
+  for (const item of cs.items) {
+    if (item.kind === "goal") {
+      c.goals.push(item.plan.title);
+      c.milestones += item.plan.milestones.length;
+      c.tasks += item.plan.milestones.reduce((n, m) => n + m.projects.reduce((n2, p) => n2 + p.tasks.length, 0), 0);
+      c.sessions += item.sessions.length;
+    } else if (item.kind === "milestone") {
+      c.milestones += 1;
+      c.tasks += item.tasks.length;
+    } else if (item.kind === "task") c.tasks += 1;
+    else if (item.kind === "task_update") c.updated += 1;
+    else if (item.kind === "week") c.sessions += item.days.reduce((n, d) => n + d.blocks.filter((b) => b.kind === "task").length, 0);
+    else c.rescheduled += 1;
+  }
+  return c;
+}
+
 /** A short digest of everything a change set depends on. */
 export function fingerprint(state: ProposalState): string {
   const parts = [
@@ -78,6 +107,70 @@ export function fingerprint(state: ProposalState): string {
 const planning = (s: ProposalState): PlanningState => ({ tasks: s.tasks, commitments: s.commitments, blocks: s.blocks, skips: s.skips, prefs: s.prefs });
 const isProtectedTask = (task: Task) => task.status === "done" || task.status === "skipped" || task.status === "in_progress" || task.progressMin > 0;
 
+/** Titles compared loosely: case, spacing, punctuation, Persian letter forms and one-letter typos don't matter. */
+function normalTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\u064a/g, "\u06cc")
+    .replace(/\u0643/g, "\u06a9")
+    .replace(/[\s\u200c\p{P}]+/gu, "");
+}
+
+export function sameTitle(a: string, b: string): boolean {
+  const x = normalTitle(a);
+  const y = normalTitle(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const longest = Math.max(x.length, y.length);
+  if (Math.abs(x.length - y.length) > longest * 0.15) return false;
+  // Levenshtein distance, two rows.
+  let prev = Array.from({ length: y.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= x.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= y.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return 1 - prev[y.length] / longest >= 0.85;
+}
+
+/**
+ * Small models like to re-create things that already exist. Copies of open tasks, of
+ * active goals, and a milestone that repeats a goal created in the same answer are left out.
+ */
+function withoutDuplicates(operations: ResolvedOperation[], state: ProposalState, rejected: Rejection[]): ResolvedOperation[] {
+  const openTasks = state.tasks.filter((x) => x.status !== "done" && x.status !== "skipped").map((x) => x.title);
+  const isOpenTask = (title: string) => openTasks.some((x) => sameTitle(x, title));
+  const newGoals = operations.flatMap((op) => (op.type === "create_goal" ? [op.title] : []));
+  const out: ResolvedOperation[] = [];
+  for (const op of operations) {
+    const drop = (title: string) => rejected.push({ type: op.type, code: "duplicate", detail: title });
+    if (op.type === "create_goal") {
+      if (state.goals.some((g) => !g.archived && sameTitle(g.title, op.title))) drop(op.title);
+      else out.push(op);
+    } else if (op.type === "create_milestone") {
+      const existing = state.milestones.some((m) => m.goalId === op.goalId && sameTitle(m.title, op.title));
+      if (existing || newGoals.some((g) => sameTitle(g, op.title))) {
+        drop(op.title);
+        continue;
+      }
+      const tasks = op.tasks.filter((x) => {
+        if (!isOpenTask(x.title)) return true;
+        drop(x.title);
+        return false;
+      });
+      // A milestone that only held copies has nothing left to add.
+      if (op.tasks.length && !tasks.length) continue;
+      out.push({ ...op, tasks });
+    } else if (op.type === "create_task") {
+      if (isOpenTask(op.task.title)) drop(op.task.title);
+      else out.push(op);
+    } else {
+      out.push(op);
+    }
+  }
+  return out;
+}
+
 export function buildChangeSet(
   operations: ResolvedOperation[],
   state: ProposalState,
@@ -87,6 +180,7 @@ export function buildChangeSet(
   const items: ChangeItem[] = [];
   const warnings: string[] = [];
   const rejected: Rejection[] = [...(opts.rejected ?? [])];
+  operations = withoutDuplicates(operations, state, rejected);
   const kept: ResolvedOperation[] = [];
   let touchesExisting = false;
   const fa = getLang() === "fa";
