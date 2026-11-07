@@ -53,6 +53,26 @@ describe("assistant conversation", () => {
     expect(provider.requests[1].messages.at(-1)!.content).toMatch(/could not be used/);
   });
 
+  it("asks once for the missing operations when a proposal comes without any", async () => {
+    const empty = answer({ intent: "propose_changes", reply: "Shall I make you a running plan?", proposal: { summary: "Running" } });
+    const full = answer({ intent: "propose_changes", reply: "I'll add a 10K goal. Shall I add it?", proposal: { summary: "Run a 10K" }, operations: [goalOperation() as never] });
+    const provider = createMockProvider([empty, full]);
+    const result = await runTurn({ ...base, provider, userText: "I want to run a 10K" });
+    expect(result.status === "ok" && result.operations.length).toBe(1);
+    expect(provider.requests[1].messages.at(-1)!.content).toMatch(/operations is empty/);
+
+    // A second empty proposal is shown as advice rather than an error.
+    const again = await runTurn({ ...base, provider: createMockProvider([empty, empty]), userText: "I want to run a 10K" });
+    expect(again.status === "ok" && again.response.intent).toBe("advice");
+  });
+
+  it("resolves date words before the model sees them", async () => {
+    const provider = createMockProvider([answer()]);
+    await runTurn({ ...base, provider, lang: "fa", userText: "تا آخر دی ماه ۵ کیلو کم کنم" });
+    expect(provider.requests[0].messages.at(-1)!.content).toContain("آخر دی ماه (2027-01-20) 5 کیلو");
+    expect(provider.requests[0].system).toContain("Persian months");
+  });
+
   it("gives up after a second broken answer instead of guessing", async () => {
     const provider = createMockProvider(["nope", "still nope"]);
     const result = await runTurn({ ...base, provider, userText: "Plan my day" });

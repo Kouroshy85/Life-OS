@@ -220,3 +220,40 @@ describe("applying proposals", () => {
     expect(after.goals.length).toBe(before.goals.length);
   });
 });
+
+describe("leaving out duplicates", () => {
+  const task = (title: string) => ({ title, notes: "", estimateMin: 30, priority: 2 as const, energy: null, deadline: null });
+
+  it("drops copies of open tasks, even with small spelling differences", () => {
+    const cs = build([
+      { type: "create_milestone", goalId: "goal-ielts", title: "Reading", description: "", deadline: null, tasks: [task("Practice a listening test"), task("Read one article")] },
+      { type: "create_task", parent: null, task: task("learn 30 new words") },
+    ]);
+    const milestone = cs.items.find((i) => i.kind === "milestone");
+    expect(milestone?.kind === "milestone" && milestone.tasks.map((x) => x.title)).toEqual(["Read one article"]);
+    expect(cs.items.some((i) => i.kind === "task")).toBe(false);
+    expect(cs.rejected.filter((r) => r.code === "duplicate").map((r) => r.detail)).toEqual(["Practice a listening test", "learn 30 new words"]);
+  });
+
+  it("keeps done tasks out of the comparison, and drops copies of goals and existing milestones", () => {
+    const cs = build([
+      { type: "create_task", parent: null, task: task("Book the exam") },
+      goalOp({ title: "ielts" }),
+      { type: "create_milestone", goalId: "goal-ielts", title: "Listening", description: "", deadline: null, tasks: [task("Shadow a podcast")] },
+    ]);
+    expect(cs.items.map((i) => i.kind)).toEqual(["task"]);
+    expect(cs.rejected.map((r) => r.code)).toEqual(["duplicate", "duplicate"]);
+  });
+
+  it("drops a milestone whose tasks were all copies", () => {
+    const cs = build([{ type: "create_milestone", goalId: "goal-ielts", title: "Practice", description: "", deadline: null, tasks: [task("Practise a listening test")] }]);
+    expect(cs.items).toEqual([]);
+    expect(cs.rejected.map((r) => r.code)).toEqual(["duplicate"]);
+  });
+
+  it("drops a milestone that repeats a goal created in the same answer", () => {
+    const cs = build([goalOp({ title: "Lose 5 kg" }), { type: "create_milestone", goalId: "goal-ielts", title: "Lose 5 kg", description: "", deadline: null, tasks: [task("Walk 30 minutes")] }]);
+    expect(cs.items.map((i) => i.kind)).toEqual(["goal"]);
+    expect(cs.rejected[0]).toMatchObject({ code: "duplicate", detail: "Lose 5 kg" });
+  });
+});

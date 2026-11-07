@@ -1,7 +1,7 @@
 import { ArrowRight, Check, CircleAlert, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import type { ResolvedOperation, Rejection } from "../../ai/assistant/parse";
-import type { ChangeItem, ChangeSet } from "../../ai/assistant/proposals";
+import { changeCounts, type ChangeItem, type ChangeSet } from "../../ai/assistant/proposals";
 import { num } from "../../domain/locale";
 import { formatClock, formatDuration, formatShortDate } from "../../domain/time";
 import { t } from "../../i18n";
@@ -9,7 +9,7 @@ import type { ChatMessage } from "../../persistence/repository";
 import { applyProposal, cancelProposal, editProposal } from "../../state/assistant";
 import { useApp } from "../../state/store";
 import { NumberInput, TextInput } from "../../ui/fields";
-import { Button, Confirm, Field } from "../../ui/primitives";
+import { Button, Field } from "../../ui/primitives";
 
 const WEEKDAY_SHORT = () => t.weekdays;
 
@@ -37,6 +37,8 @@ export function rejectionText(r: Rejection): string {
       return t.aiRejNothing;
     case "no_milestone":
       return t.aiRejNoMilestone;
+    case "duplicate":
+      return t.aiRejDuplicate(r.detail);
     default:
       return t.aiRejInvalid;
   }
@@ -260,14 +262,19 @@ function EditForm({ cs, onDone }: { cs: ChangeSet; onDone: (ops: ResolvedOperati
   );
 }
 
+/**
+ * A proposal as a small approval card: what it is, one line on what changes, and Yes / No.
+ * The full preview folds away under Details. "Yes" saves straight away; there is no second
+ * confirmation, and the card says when existing plans are affected.
+ */
 export function ProposalCard({ msg }: { msg: ChatMessage }) {
   const cs = msg.proposal as ChangeSet;
   const [editing, setEditing] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [working, setWorking] = useState(false);
   const pending = msg.proposalStatus === "pending";
   const fresh = cs.items.filter(isNew);
   const changed = cs.items.filter((i) => !isNew(i));
+  const c = changeCounts(cs);
 
   const apply = async () => {
     setWorking(true);
@@ -280,10 +287,24 @@ export function ProposalCard({ msg }: { msg: ChatMessage }) {
   return (
     <div className={`proposal ${pending ? "" : "proposal--done"}`}>
       <div className="proposal__head">
-        <strong>{t.aiProposalTitle}</strong>
+        <strong dir="auto">{cs.summary || t.aiProposalTitle}</strong>
         {msg.proposalStatus && !pending && <span className={`chip proposal__status proposal__status--${msg.proposalStatus}`}>{statusLabel[msg.proposalStatus]}</span>}
       </div>
-      {cs.summary && <p className="muted proposal__summary">{cs.summary}</p>}
+      {cs.items.length > 0 && <p className="muted proposal__summary tabular">{t.aiPreview(c.goals, c.milestones, c.tasks, c.updated, c.sessions, c.rescheduled)}</p>}
+      {pending && cs.touchesExisting && (
+        <p className="proposal__touches">
+          <CircleAlert size={14} /> {t.aiTouchesTitle}
+        </p>
+      )}
+      {cs.warnings.length > 0 && (
+        <ul className="proposal__warnings">
+          {cs.warnings.map((w, i) => (
+            <li key={i}>
+              <CircleAlert size={14} /> {w}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {editing ? (
         <EditForm
@@ -295,67 +316,54 @@ export function ProposalCard({ msg }: { msg: ChatMessage }) {
         />
       ) : (
         <>
-          {fresh.length > 0 && (
-            <section className="proposal__section">
-              <h4>{t.aiNew}</h4>
-              {fresh.map((item, i) => (
-                <ItemView key={i} item={item} />
-              ))}
-            </section>
-          )}
-          {changed.length > 0 && (
-            <section className="proposal__section proposal__section--existing">
-              <h4>{cs.items.some((i) => i.kind === "reschedule") ? t.aiMoved : t.aiChanged}</h4>
-              {changed.map((item, i) => (
-                <ItemView key={i} item={item} />
-              ))}
-            </section>
-          )}
-          {cs.warnings.length > 0 && (
-            <ul className="proposal__warnings">
-              {cs.warnings.map((w, i) => (
-                <li key={i}>
-                  <CircleAlert size={14} /> {w}
-                </li>
-              ))}
-            </ul>
-          )}
-          {cs.rejected.length > 0 && (
-            <div className="proposal__rejected">
-              <span className="faint">{t.aiRejectedTitle(num(cs.rejected.length))}</span>
-              <ul>
-                {cs.rejected.map((r, i) => (
-                  <li key={i} className="faint">
-                    {rejectionText(r)}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {(cs.items.length > 0 || cs.rejected.length > 0) && (
+            <details className="proposal__details" open={cs.items.length === 0}>
+              <summary>{t.aiDetails}</summary>
+              {fresh.length > 0 && (
+                <section className="proposal__section">
+                  <h4>{t.aiNew}</h4>
+                  {fresh.map((item, i) => (
+                    <ItemView key={i} item={item} />
+                  ))}
+                </section>
+              )}
+              {changed.length > 0 && (
+                <section className="proposal__section proposal__section--existing">
+                  <h4>{cs.items.some((i) => i.kind === "reschedule") ? t.aiMoved : t.aiChanged}</h4>
+                  {changed.map((item, i) => (
+                    <ItemView key={i} item={item} />
+                  ))}
+                </section>
+              )}
+              {cs.rejected.length > 0 && (
+                <div className="proposal__rejected">
+                  <span className="faint">{t.aiRejectedTitle(num(cs.rejected.length))}</span>
+                  <ul>
+                    {cs.rejected.map((r, i) => (
+                      <li key={i} className="faint">
+                        {rejectionText(r)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </details>
           )}
           {pending && cs.items.length > 0 && (
             <div className="proposal__actions">
               <Button variant="ghost" size="sm" icon={<X size={14} />} onClick={() => cancelProposal(msg.id)} disabled={working}>
-                {t.aiCancelProposal}
+                {t.aiNo}
               </Button>
               <Button variant="glass" size="sm" icon={<Pencil size={14} />} onClick={() => setEditing(true)} disabled={working}>
                 {t.edit}
               </Button>
-              <Button variant="primary" size="sm" icon={<Check size={14} />} disabled={working} onClick={() => (cs.touchesExisting ? setConfirming(true) : void apply())}>
-                {t.aiApply}
+              <Button variant="primary" size="sm" icon={<Check size={14} />} disabled={working} onClick={() => void apply()}>
+                {t.aiYesApply}
               </Button>
             </div>
           )}
         </>
       )}
-
-      <Confirm
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={t.aiTouchesTitle}
-        message={t.aiTouchesMsg}
-        confirmLabel={t.aiApplyAnyway}
-        onConfirm={() => void apply()}
-      />
     </div>
   );
 }

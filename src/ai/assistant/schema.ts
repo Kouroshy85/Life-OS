@@ -10,7 +10,7 @@
 
 import { z } from "zod";
 
-export const SCHEMA_VERSION = "1";
+export const SCHEMA_VERSION = "2";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD");
 const goalRef = z.string().regex(/^g\d{1,4}$/, "unknown goal reference");
@@ -22,7 +22,7 @@ const timeOfDay = z.enum(["any", "morning", "afternoon", "evening", "focus"]);
 
 const taskDraft = z.strictObject({
   title,
-  notes: z.string().max(600),
+  notes: z.string().max(200),
   estimate_min: z.number().int().min(5).max(480),
   priority: z.number().int().min(1).max(4),
   energy,
@@ -32,29 +32,30 @@ const taskDraft = z.strictObject({
 export const createGoal = z.strictObject({
   type: z.literal("create_goal"),
   title,
-  description: z.string().max(400),
+  description: z.string().max(200),
   target_date: date.nullable(),
-  hours_per_week: z.number().min(1).max(40),
+  // Whole hours, so the grammar can enforce the range (it can't for decimals).
+  hours_per_week: z.number().int().min(1).max(40),
   milestones: z
     .array(
       z.strictObject({
         title,
-        description: z.string().max(400),
+        description: z.string().max(200),
         deadline: date.nullable(),
-        tasks: z.array(taskDraft).min(1).max(10),
+        tasks: z.array(taskDraft).min(1).max(5),
       }),
     )
     .min(1)
-    .max(8),
+    .max(4),
 });
 
 export const createMilestone = z.strictObject({
   type: z.literal("create_milestone"),
   goal_ref: goalRef,
   title,
-  description: z.string().max(400),
+  description: z.string().max(200),
   deadline: date.nullable(),
-  tasks: z.array(taskDraft).max(10),
+  tasks: z.array(taskDraft).max(5),
 });
 
 export const createTask = taskDraft.extend({
@@ -69,7 +70,7 @@ export const updateTask = z.strictObject({
   /** Each field is null when it shouldn't change. Status is never changed here. */
   changes: z.strictObject({
     title: title.nullable(),
-    notes: z.string().max(600).nullable(),
+    notes: z.string().max(200).nullable(),
     estimate_min: z.number().int().min(5).max(480).nullable(),
     priority: z.number().int().min(1).max(4).nullable(),
     energy,
@@ -97,11 +98,14 @@ export const operation = z.discriminatedUnion("type", [createGoal, createMilesto
 
 export const assistantResponse = z.strictObject({
   intent: z.enum(["advice", "clarification", "propose_changes", "out_of_scope"]),
-  reply: z.string().trim().min(1).max(2000),
+  // Short on purpose: Life OS shows the details itself, and long answers are slow on a CPU.
+  reply: z.string().trim().min(1).max(600),
   needs_clarification: z.boolean(),
-  clarification: z.string().max(400).nullable(),
-  proposal: z.strictObject({ summary: z.string().max(400) }).nullable(),
-  operations: z.array(operation).max(12),
+  clarification: z.string().max(200).nullable(),
+  /** Up to four short answers the user can tap instead of typing. */
+  choices: z.array(z.string().trim().min(1).max(60)).max(4),
+  proposal: z.strictObject({ summary: z.string().max(120) }).nullable(),
+  operations: z.array(operation).max(5),
 });
 
 export type Operation = z.infer<typeof operation>;

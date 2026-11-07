@@ -5,10 +5,12 @@
  * tested with a scripted model.
  */
 
+import { toLatinDigits } from "../../domain/locale";
 import { en } from "../../i18n/en";
 import type { ChatMessage } from "../../persistence/repository";
 import { messageText } from "./messages";
 import { ProviderError, type ChatTurn, type LocalModelProvider } from "../providers/types";
+import { annotateDates } from "./dates";
 import { buildContext, type AliasMap, type ContextSource, type RequestKind } from "./context";
 import { parseResponse, type Rejection, type ResolvedOperation } from "./parse";
 import { responseJsonSchema, type AssistantResponse } from "./schema";
@@ -61,7 +63,8 @@ export function historyTurns(history: ChatMessage[]): ChatTurn[] {
 
 /** The user's message wrapped with the context. Their words are marked as data, never instructions. */
 export function userTurn(text: string, contextText: string, events: string[] = []): string {
-  const safe = text.replace(/<\/?(user_message|lifeos_context)>/gi, "");
+  // Persian and Arabic digits become ordinary ones, so "۲۰ نوامبر" reads as a date.
+  const safe = toLatinDigits(text.replace(/<\/?(user_message|lifeos_context)>/gi, ""));
   const recent = events.length ? `\nRecent Life OS events:\n${events.map((e) => `- ${e}`).join("\n")}` : "";
   return `<lifeos_context>\n${contextText}${recent}\n</lifeos_context>\n<user_message>\n${safe}\n</user_message>`;
 }
@@ -69,9 +72,9 @@ export function userTurn(text: string, contextText: string, events: string[] = [
 export async function runTurn(input: TurnInput): Promise<TurnResult> {
   const { provider, signal } = input;
   const context = buildContext(input.source, input.kind);
-  const system = systemPrompt(input.lang);
+  const system = systemPrompt(input.lang, input.source.today);
   const jsonSchema = responseJsonSchema();
-  const messages: ChatTurn[] = [...historyTurns(input.history), { role: "user", content: userTurn(input.userText, context.text, input.recentEvents) }];
+  const messages: ChatTurn[] = [...historyTurns(input.history), { role: "user", content: userTurn(annotateDates(input.userText, input.source.today), context.text, input.recentEvents) }];
 
   let errors: string[] = [];
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -93,10 +96,16 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
       errors = ["The answer was cut off before it was complete. Keep it shorter."];
     } else {
       const parsed = parseResponse(raw, context.aliases, input.source.today);
-      if (parsed.ok) {
+      // Small models sometimes ask "Shall I make a plan?" without the plan. There's nothing to
+      // approve then, so ask once for the operations, and otherwise show the reply as advice.
+      const empty = parsed.ok && parsed.response.intent === "propose_changes" && !parsed.operations.length && !parsed.rejected.length;
+      if (parsed.ok && empty && attempt === 2) {
+        return { status: "ok", response: { ...parsed.response, intent: "advice", proposal: null }, operations: [], rejected: [], aliases: context.aliases, attempts: attempt };
+      }
+      if (parsed.ok && !empty) {
         return { status: "ok", response: parsed.response, operations: parsed.operations, rejected: parsed.rejected, aliases: context.aliases, attempts: attempt };
       }
-      errors = parsed.errors;
+      errors = parsed.ok ? ["intent is propose_changes but operations is empty. Put the complete change in operations now; the user approves it with a button"] : parsed.errors;
     }
     if (attempt === 2) break;
     // One repair attempt, telling the model exactly what was wrong.
