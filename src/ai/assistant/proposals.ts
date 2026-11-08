@@ -8,11 +8,12 @@
 import { effortCheck, sanitizePlan, type CompiledPlan } from "../../domain/goalCompiler";
 import { planGoalSessions, type GoalSession } from "../../domain/goalPlanner";
 import { getLang, weekStartDay } from "../../domain/locale";
-import { weekDates } from "../../domain/plans";
+import { dayBit, occursOn, weekDates } from "../../domain/plans";
+import { overlaps } from "../../domain/intervals";
 import { addDays, weekdayOf } from "../../domain/time";
 import type { Commitment, DateKey, Goal, Milestone, Plan, Preferences, Project, ScheduleBlock, Task } from "../../domain/types";
 import { explain, t } from "../../i18n";
-import { newId, nowIso } from "../../persistence/repository";
+import { makePlan, newId, nowIso } from "../../persistence/repository";
 import { earliestSlot, isKept, liveBlocks, prefsForTimeOfDay, proposeWeek, type Clock, type PlanningState } from "../../state/planning";
 import type { Rejection, ResolvedOperation, ResolvedTask } from "./parse";
 
@@ -40,7 +41,8 @@ export type ChangeItem =
   | { kind: "task"; parent: { kind: "goal" | "milestone"; id: string } | null; parentTitle: string | null; task: ResolvedTask }
   | { kind: "task_update"; taskId: string; title: string; before: Partial<ResolvedTask>; after: Partial<ResolvedTask> }
   | { kind: "week"; taskIds: string[]; days: { date: DateKey; blocks: ScheduleBlock[] }[]; unscheduled: { taskId: string; title: string; reason: string }[] }
-  | { kind: "reschedule"; taskId: string; title: string; from: SlotView[]; to: ScheduleBlock[] };
+  | { kind: "reschedule"; taskId: string; title: string; from: SlotView[]; to: ScheduleBlock[] }
+  | { kind: "event"; plan: Plan };
 
 export interface ChangeSet {
   version: 1;
@@ -58,6 +60,7 @@ export interface ChangeSet {
 }
 
 export interface ChangeCounts {
+  events: number;
   goals: string[];
   milestones: number;
   tasks: number;
@@ -68,7 +71,7 @@ export interface ChangeCounts {
 
 /** What applying a change set would add or change, counted the way the "saved" note counts it. */
 export function changeCounts(cs: ChangeSet): ChangeCounts {
-  const c: ChangeCounts = { goals: [], milestones: 0, tasks: 0, updated: 0, sessions: 0, rescheduled: 0 };
+  const c: ChangeCounts = { events: 0, goals: [], milestones: 0, tasks: 0, updated: 0, sessions: 0, rescheduled: 0 };
   for (const item of cs.items) {
     if (item.kind === "goal") {
       c.goals.push(item.plan.title);
@@ -80,6 +83,7 @@ export function changeCounts(cs: ChangeSet): ChangeCounts {
       c.tasks += item.tasks.length;
     } else if (item.kind === "task") c.tasks += 1;
     else if (item.kind === "task_update") c.updated += 1;
+    else if (item.kind === "event") c.events += 1;
     else if (item.kind === "week") c.sessions += item.days.reduce((n, d) => n + d.blocks.filter((b) => b.kind === "task").length, 0);
     else c.rescheduled += 1;
   }
@@ -312,6 +316,24 @@ export function buildChangeSet(
         }));
         if (unscheduled.length) warnings.push(t.aiWarnUnscheduled(unscheduled.length));
         items.push({ kind: "week", taskIds: usable, days: week.days, unscheduled });
+        kept.push(op);
+        break;
+      }
+
+      case "create_event": {
+        const repeating = op.repeatDays.length > 0;
+        const plan = makePlan({
+          type: "event",
+          title: op.title,
+          start: op.start,
+          end: op.end,
+          dates: repeating ? null : [op.date],
+          weekdays: op.repeatDays.reduce((bits, d) => bits | dayBit(d), 0),
+          validFrom: repeating ? op.date : null,
+        });
+        const clash = state.plans.find((p) => occursOn(p, op.date) && overlaps(p, plan));
+        if (clash) warnings.push(t.aiWarnEventClash(op.title, clash.title));
+        items.push({ kind: "event", plan });
         kept.push(op);
         break;
       }

@@ -150,11 +150,15 @@ describe("assistant conversation", () => {
     const turns = historyTurns([
       msg("assistant", "orphan"),
       msg("user", "Plan my week"),
-      msg("assistant", "Here's a plan", { proposal: { summary: "Three sessions" }, proposalStatus: "applied" }),
+      msg("assistant", "Here's a plan", { proposal: { summary: "Three sessions", items: [{}] }, proposalStatus: "applied" }),
       msg("note", "Saved: 3 sessions."),
     ]);
     expect(turns.map((x) => x.role)).toEqual(["user", "assistant"]);
     expect(turns[1].content).toContain("Three sessions; status: applied");
+    // A proposal that ended up empty must not read as one waiting for a yes.
+    const empty = historyTurns([msg("user", "Add my meeting"), msg("assistant", "Added it!", { proposal: { summary: "Meeting", items: [] }, proposalStatus: null })]);
+    expect(empty[1].content).toContain("nothing was proposed or saved");
+    expect(empty[1].content).not.toContain("pending");
   });
 });
 
@@ -192,5 +196,81 @@ describe("streaming and providers", () => {
     expect(classifyRequest("برای امتحانم برنامه می‌خوام")).toBe("study");
     expect(classifyRequest("خیلی استرس دارم")).toBe("overwhelmed");
     expect(classifyRequest("How's my progress?")).toBe("review");
+  });
+});
+
+describe("checking appointments against the user's words", () => {
+  const event = (start: number, repeatDays: number[] = []) => ({ type: "create_event" as const, title: "Meeting", date: "2026-11-09", start: start * 60, end: (start + 1) * 60, repeatDays });
+
+  it("keeps the user's own times and drops a weekly repeat they never asked for", async () => {
+    const { checkEvents } = await import("./conversation");
+    const ops = [event(21, [1])];
+    expect(checkEvents(ops, "دوشنبه (2026-11-09) ساعت 9 شب (21:00) تا 10 شب (22:00) قرار دارم")).toBeNull();
+    expect(ops[0].repeatDays).toEqual([]);
+  });
+
+  it("repeats when they said every, on the event's own weekday if none was given", async () => {
+    const { checkEvents } = await import("./conversation");
+    const ops = [event(7)];
+    expect(checkEvents(ops, "هر شنبه (2026-11-07) ساعت ۷ تا ۸ صبح (08:00) کلاس زبان دارم")).toBeNull();
+    expect(ops[0].repeatDays).toEqual([1]);
+    // A wrong weekday from the model is replaced by the date's own.
+    const wrongDay = [{ ...event(7), date: "2026-11-07", repeatDays: [0] }];
+    expect(checkEvents(wrongDay, "هر شنبه (2026-11-07) ساعت 7 تا 8 صبح (08:00) کلاس زبان دارم")).toBeNull();
+    expect(wrongDay[0].repeatDays).toEqual([6]);
+    const en = [event(16)];
+    expect(checkEvents(en, "Add gym every Monday (2026-11-09) at 4pm (16:00)")).toBeNull();
+    expect(en[0].repeatDays).toEqual([1]);
+  });
+
+  it("refuses a time the user never gave, ignoring the digits of resolved dates", async () => {
+    const { checkEvents } = await import("./conversation");
+    expect(checkEvents([event(10)], "فردا (2026-11-10) وقت دکتر دارم")).toMatch(/didn't give a time/);
+  });
+
+  it("sends the model back once when it invents a time", async () => {
+    const invented = answer({
+      intent: "propose_changes",
+      reply: "I'll add it at 10. Shall I add it?",
+      proposal: { summary: "Doctor" },
+      operations: [{ type: "create_event", title: "Doctor", date: "2026-11-06", start: "10:00", end: "10:30", repeat_days: [] } as never],
+    });
+    const asks = answer({ intent: "clarification", reply: "What time is it?", needs_clarification: true, clarification: "What time is it?", choices: ["09:00", "14:00"] });
+    const provider = createMockProvider([invented, asks]);
+    const result = await runTurn({ ...base, provider, userText: "I have a doctor's appointment tomorrow" });
+    expect(result.status === "ok" && result.response.intent).toBe("clarification");
+    expect(provider.requests[1].messages.at(-1)!.content).toMatch(/didn't give a time/);
+  });
+});
+
+describe("appointments read in code", () => {
+  const monday = "دوشنبه ساعت 9 شب تا 10 شب قرار دارم. اضافش کن به برنامم";
+
+  it("builds the appointment itself when the model twice fails to propose it", async () => {
+    const advice = answer({ intent: "advice", reply: "قرارت خوبه!" });
+    const provider = createMockProvider([advice, advice]);
+    const result = await runTurn({ ...base, lang: "fa", provider, userText: monday });
+    expect(provider.requests[1].messages.at(-1)!.content).toContain("2026-11-09 from 21:00 to 22:00");
+    expect(result.status === "ok" && result.response.intent).toBe("propose_changes");
+    expect(result.status === "ok" && result.operations).toEqual([{ type: "create_event", title: "قرار", date: "2026-11-09", start: 1260, end: 1320, repeatDays: [] }]);
+    expect(result.status === "ok" && result.response.reply).toMatch(/اضافه‌ش کنم؟$/);
+  });
+
+  it("uses the user's times when the model's differ, and never says it's already done", async () => {
+    const wrong = answer({
+      intent: "propose_changes",
+      reply: "قرار دوشنبه رو به برنامه اضافه کردم.",
+      proposal: { summary: "قرار" },
+      operations: [{ type: "create_event", title: "قرار", date: "2026-11-10", start: "09:00", end: "10:00", repeat_days: [1] } as never],
+    });
+    const result = await runTurn({ ...base, lang: "fa", provider: createMockProvider([wrong]), userText: monday });
+    expect(result.status === "ok" && result.operations[0]).toMatchObject({ date: "2026-11-09", start: 1260, end: 1320, repeatDays: [] });
+    expect(result.status === "ok" && result.response.reply).toBe("قرار دوشنبه رو به برنامه اضافه می‌کنم.");
+  });
+
+  it("rewrites past-tense claims in English too", async () => {
+    const { futureTense } = await import("./conversation");
+    expect(futureTense("I've added your dentist appointment. Shall I keep it?", "en")).toBe("I'll add your dentist appointment. Shall I keep it?");
+    expect(futureTense("I created a goal", "en")).toBe("I'll create a goal");
   });
 });

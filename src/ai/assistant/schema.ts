@@ -19,6 +19,7 @@ const parentRef = z.string().regex(/^[gm]\d{1,4}$/, "unknown goal or milestone r
 const title = z.string().trim().min(1).max(160);
 const energy = z.enum(["low", "medium", "high"]).nullable();
 const timeOfDay = z.enum(["any", "morning", "afternoon", "evening", "focus"]);
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "time must be HH:MM");
 
 const taskDraft = z.strictObject({
   title,
@@ -94,7 +95,18 @@ export const proposeReschedule = z.strictObject({
   time_of_day: timeOfDay,
 });
 
-export const operation = z.discriminatedUnion("type", [createGoal, createMilestone, createTask, updateTask, proposeWeeklySchedule, proposeReschedule]);
+/** A fixed appointment, class or event at times the user gave. The only operation with clock times. */
+export const createEvent = z.strictObject({
+  type: z.literal("create_event"),
+  title,
+  date,
+  start: clockTime,
+  end: clockTime,
+  /** Weekdays it repeats on (0 = Sunday … 6 = Saturday), starting from date; empty for a one-time event. */
+  repeat_days: z.array(z.number().int().min(0).max(6)).max(7),
+});
+
+export const operation = z.discriminatedUnion("type", [createGoal, createMilestone, createTask, updateTask, proposeWeeklySchedule, proposeReschedule, createEvent]);
 
 export const assistantResponse = z.strictObject({
   intent: z.enum(["advice", "clarification", "propose_changes", "out_of_scope"]),

@@ -21,6 +21,7 @@ export interface AppliedCounts {
   updated: number;
   sessions: number;
   rescheduled: number;
+  events: number;
 }
 
 const taskFields = (x: ResolvedTask) => ({
@@ -39,7 +40,7 @@ export function changeSetStatements(
   today: DateKey,
 ): { statements: SqlStatement[]; counts: AppliedCounts } {
   const statements: SqlStatement[] = [];
-  const counts: AppliedCounts = { goals: [], goalIds: [], milestones: 0, tasks: 0, updated: 0, sessions: 0, rescheduled: 0 };
+  const counts: AppliedCounts = { goals: [], goalIds: [], milestones: 0, tasks: 0, updated: 0, sessions: 0, rescheduled: 0, events: 0 };
   const validFrom = weekDates(today, weekStartDay())[0];
   let goalOrder = state.goals.length;
   const nextTaskOrder = (() => {
@@ -139,6 +140,11 @@ export function changeSetStatements(
         break;
       }
 
+      case "event": {
+        statements.push(repo.planUpsert(item.plan));
+        counts.events += 1;
+        break;
+      }
       case "reschedule": {
         const old = state.blocks.filter(
           (b) => b.taskId === item.taskId && !b.proposed && b.date >= today && b.state === "planned" && !b.pinned,

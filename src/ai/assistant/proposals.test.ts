@@ -257,3 +257,27 @@ describe("leaving out duplicates", () => {
     expect(cs.rejected[0]).toMatchObject({ code: "duplicate", detail: "Lose 5 kg" });
   });
 });
+
+describe("appointments", () => {
+  it("adds a one-time appointment at the user's times and saves it as an event plan", async () => {
+    const { repo } = await repoWithSample();
+    const snap = await repo.loadSnapshot();
+    const state = { ...snap, commitments: snap.commitments };
+    const cs = buildChangeSet([{ type: "create_event", title: "Meeting", date: "2026-11-09", start: 21 * 60, end: 22 * 60, repeatDays: [] }], state, CLOCK, { summary: "", model: null });
+    expect(cs.items).toHaveLength(1);
+    const item = cs.items[0];
+    expect(item.kind === "event" && item.plan).toMatchObject({ type: "event", title: "Meeting", dates: ["2026-11-09"], start: 1260, end: 1320, weekdays: 0 });
+    const { statements, counts } = changeSetStatements(repo, cs, state, CLOCK.today);
+    await repo.run(statements);
+    expect(counts.events).toBe(1);
+    expect((await repo.loadSnapshot()).plans.some((p) => p.title === "Meeting" && p.type === "event" && p.dates?.[0] === "2026-11-09")).toBe(true);
+  });
+
+  it("repeats weekly when asked, and warns about a clash with a fixed plan", () => {
+    const cs = build([{ type: "create_event", title: "Swimming", date: "2026-11-06", start: 7 * 60 + 30, end: 8 * 60 + 30, repeatDays: [5] }]);
+    const item = cs.items[0];
+    expect(item.kind === "event" && item.plan).toMatchObject({ dates: null, weekdays: 1 << 5, validFrom: "2026-11-06" });
+    // Friday's gym is 07:00–08:00.
+    expect(cs.warnings.some((w) => w.includes("Gym"))).toBe(true);
+  });
+});

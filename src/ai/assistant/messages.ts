@@ -8,7 +8,7 @@ import type { Dict } from "../../i18n/en";
 import type { ChatMessage } from "../../persistence/repository";
 
 export type AppNote =
-  | { k: "saved"; goals: string[]; goalIds: string[]; milestones: number; tasks: number; updated: number; sessions: number; rescheduled: number }
+  | { k: "saved"; goals: string[]; goalIds: string[]; milestones: number; tasks: number; updated: number; sessions: number; rescheduled: number; events?: number }
   | { k: "saveFailed"; why: string }
   | { k: "invalid" }
   | { k: "error"; code: "unavailable" | "model_missing" | "insufficient_memory" | "load_failed" | "generation_failed" }
@@ -31,7 +31,7 @@ export function decodeNote(content: string): AppNote | null {
 export function noteText(note: AppNote, d: Dict): string {
   switch (note.k) {
     case "saved":
-      return d.aiSaved(note.goals, note.milestones, note.tasks, note.updated, note.sessions, note.rescheduled);
+      return d.aiSaved(note.goals, note.milestones, note.tasks, note.updated, note.sessions, note.rescheduled, note.events ?? 0);
     case "saveFailed":
       return d.aiSaveFailed(note.why);
     case "invalid":

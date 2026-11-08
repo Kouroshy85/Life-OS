@@ -93,6 +93,60 @@ const alt = (words: string[]) => words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/
 const B = "(?<![\\p{L}\\u200c])";
 const E = "(?![\\p{L}\\u200c])";
 
+export interface FoundAppointment {
+  date: DateKey;
+  start: number;
+  end: number;
+  title: string;
+}
+
+const APPOINTMENT_WORDS: [RegExp, string | null][] = [
+  [/کلاس\s+[^\s،,.؟?!]+/, null],
+  [/وقت\s+(دکتر|دندون‌?پزشکی|دندانپزشکی|آرایشگاه)/, null],
+  [/(قرار|جلسه|مهمونی|مهمانی|باشگاه|امتحان|کلاس|دکتر|مصاحبه)/, null],
+  [/(dentist|doctor|haircut)( appointment)?/i, null],
+  [/(meeting|appointment|class|lesson|interview|exam|gym|party|call)/i, null],
+];
+
+/**
+ * A fixed appointment described in an annotated message: a resolved date and a time
+ * range, such as "دوشنبه (2026-11-09) ساعت 9 شب (21:00) تا 10 شب (22:00)" or
+ * "Tuesday (2026-11-10) from 4pm (16:00) to 5pm (17:00)". Null when there's no clear date and range.
+ */
+export function findAppointment(annotated: string, fallbackTitle: string): FoundAppointment | null {
+  const date = annotated.match(/\((\d{4}-\d{2}-\d{2})\)/)?.[1];
+  if (!date) return null;
+  const toMin = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+  // Both ends resolved: "... (21:00) تا|to ... (22:00)".
+  const both = annotated.match(/\((\d{2}:\d{2})\)\s*(?:تا|to|until|till|-|–)\s*[^()]{0,20}?\((\d{2}:\d{2})\)/i);
+  let start: number | null = null;
+  let end: number | null = null;
+  if (both) {
+    start = toMin(both[1]);
+    end = toMin(both[2]);
+  } else {
+    // Only the end resolved: "۷ تا ۸ صبح (08:00)" takes the end's part of day for the start too.
+    const half = annotated.match(/(\d{1,2})(?::(\d{2}))?\s*(?:تا|to|until|-|–)\s*(\d{1,2})(?::(\d{2}))?[^()\d]{0,12}\((\d{2}:\d{2})\)/i);
+    if (half) {
+      end = toMin(half[5]);
+      const shift = Math.floor(end / 60) - (Number(half[3]) % 24);
+      start = (Number(half[1]) + shift) * 60 + Number(half[2] ?? 0);
+    }
+  }
+  if (start == null || end == null) return null;
+  if (end === 0) end = 24 * 60;
+  if (start < 0 || end <= start || end - start > 12 * 60) return null;
+  let title = fallbackTitle;
+  for (const [re] of APPOINTMENT_WORDS) {
+    const m = annotated.match(re);
+    if (m) {
+      title = m[0].trim();
+      break;
+    }
+  }
+  return { date, start, end, title: title.charAt(0).toUpperCase() + title.slice(1) };
+}
+
 /** The message with real dates added in parentheses after date words. Unknown phrases are left alone. */
 export function annotateDates(text: string, today: DateKey): string {
   let out = toLatinDigits(text);
@@ -133,8 +187,33 @@ export function annotateDates(text: string, today: DateKey): string {
     return addDays(today, (target - weekdayOf(today) + 7) % 7);
   });
 
-  for (const n of notes.sort((a, b) => b.at - a.at)) {
-    out = `${out.slice(0, n.at + n.len)} (${n.date})${out.slice(n.at + n.len)}`;
+  // Clock times with a part of day: "9 شب" → 21:00, "ساعت ۷ صبح", "عصر 5", "9pm", "9:30 am".
+  const day = "صبح|ظهر|بعدازظهر|بعد از ظهر|بعد‌ازظهر|عصر|شب|am|pm|a\\.m\\.|p\\.m\\.";
+  const clock = (h: number, m: number, part: string) => {
+    let hour = h;
+    if (/am|a\.m\.|صبح/.test(part)) hour = h === 12 ? 0 : h;
+    else if (/pm|p\.m\.|ظهر|عصر/.test(part)) hour = h < 12 ? h + 12 : h;
+    else if (part === "شب") hour = h === 12 ? 24 : h >= 6 && h < 12 ? h + 12 : h;
+    if (hour > 24 || m > 59 || h > 12) return null;
+    return `${pad(hour === 24 ? 0 : hour)}:${pad(m)}`;
+  };
+  const times: { at: number; len: number; text: string }[] = [];
+  const time = (re: RegExp, pick: (m: RegExpExecArray) => [number, number, string]) => {
+    for (const m of out.matchAll(re)) {
+      const [h, min, part] = pick(m as RegExpExecArray);
+      const text = clock(h, min, part.toLowerCase());
+      if (text) times.push({ at: m.index ?? 0, len: m[0].length, text });
+    }
+  };
+  time(new RegExp(`${B}(?:ساعت\\s*)?(\\d{1,2})(?::(\\d{2}))?\\s*(${day})${E}`, "giu"), (m) => [Number(m[1]), Number(m[2] ?? 0), m[3]]);
+  time(new RegExp(`${B}(صبح|ظهر|عصر|شب)\\s*(?:ساعت\\s*)?(\\d{1,2})(?::(\\d{2}))?${E}`, "gu"), (m) => [Number(m[2]), Number(m[3] ?? 0), m[1]]);
+
+  const all = [
+    ...notes.map((n) => ({ at: n.at, len: n.len, text: n.date })),
+    ...times.filter((x) => !notes.some((n) => x.at < n.at + n.len && n.at < x.at + x.len)),
+  ];
+  for (const n of all.sort((a, b) => b.at - a.at)) {
+    out = `${out.slice(0, n.at + n.len)} (${n.text})${out.slice(n.at + n.len)}`;
   }
   return out;
 }
