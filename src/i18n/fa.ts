@@ -837,8 +837,9 @@ export const fa: Dict = {
   aiYesApply: "آره، اعمال کن",
   aiNo: "نه",
   aiDetails: "جزئیات",
-  aiPreview: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number) =>
+  aiPreview: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number, events = 0) =>
     [
+      events ? `${num(events)} قرار` : null,
       ...goals.map((g) => `هدف «\u2068${g}\u2069»`),
       milestones && !goals.length ? `${num(milestones)} مرحله` : null,
       tasks ? `${num(tasks)} کار` : null,
@@ -888,11 +889,16 @@ export const fa: Dict = {
   aiRejNothing: "چیزی برای برنامه‌ریزی نمونده بود.",
   aiRejNoMilestone: "اون هدف مرحله‌ای نداره که بشه بهش اضافه کرد.",
   aiRejInvalid: "یه بخشی از جواب قابل استفاده نبود.",
+  aiWarnEventClash: (title: string, other: string) => `«\u2068${title}\u2069» با «\u2068${other}\u2069» توی برنامه‌هات هم‌زمانه.`,
+  aiRejBadTime: (range: string) => `ساعت ${range} درست نیست: باید بعد از شروعش تموم شه.`,
+  aiEventOn: (day: string, from: string, to: string) => `${day} · ${from} تا ${to}`,
+  aiEventRepeats: (days: string) => `هر ${days}`,
   aiRejDuplicate: (title: string) => `«\u2068${title}\u2069» از قبل هست، برای همین دوباره اضافه نشد.`,
   aiStopped: "متوقف شد.",
   aiInvalidAnswer: "جواب دستیار قابل استفاده نبود. یه جور دیگه بپرس.",
-  aiSaved: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number) => {
+  aiSaved: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number, events = 0) => {
     const parts = [
+      events ? `${num(events)} قرار` : null,
       ...goals.map((g) => `هدف «\u2068${g}\u2069»`),
       milestones && !goals.length ? `${num(milestones)} مرحله` : null,
       tasks ? `${num(tasks)} کار` : null,

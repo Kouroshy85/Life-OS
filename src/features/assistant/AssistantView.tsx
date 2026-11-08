@@ -138,7 +138,7 @@ function Note({ m }: { m: ChatMessage }) {
   return (
     <div className="ai-note-wrap">
       <p className="ai-note">{messageText(m, t)}</p>
-      {saved && (saved.goalIds.length > 0 || saved.sessions > 0 || saved.rescheduled > 0 || saved.tasks > 0) && (
+      {saved && (saved.goalIds.length > 0 || saved.sessions > 0 || saved.rescheduled > 0 || saved.tasks > 0 || (saved.events ?? 0) > 0) && (
         <div className="ai-note__links">
           {saved.goalIds.length > 0 ? (
             <Button variant="ghost" size="sm" icon={<Target size={13} />} onClick={() => selectGoal(saved.goalIds[0])}>
@@ -149,7 +149,7 @@ function Note({ m }: { m: ChatMessage }) {
               {t.aiViewGoals}
             </Button>
           ) : null}
-          {(saved.sessions > 0 || saved.rescheduled > 0) && (
+          {(saved.sessions > 0 || saved.rescheduled > 0 || (saved.events ?? 0) > 0) && (
             <Button variant="ghost" size="sm" icon={<LayoutGrid size={13} />} onClick={() => navigate("week")}>
               {t.aiViewWeek}
             </Button>

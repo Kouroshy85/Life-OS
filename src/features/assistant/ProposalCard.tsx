@@ -39,6 +39,8 @@ export function rejectionText(r: Rejection): string {
       return t.aiRejNoMilestone;
     case "duplicate":
       return t.aiRejDuplicate(r.detail);
+    case "bad_time":
+      return t.aiRejBadTime(r.detail);
     default:
       return t.aiRejInvalid;
   }
@@ -179,10 +181,23 @@ function ItemView({ item }: { item: ChangeItem }) {
           </ul>
         </div>
       );
+    case "event": {
+      const days = WEEKDAY_SHORT().filter((_, d) => item.plan.weekdays & (1 << d)).join(t.listJoin);
+      return (
+        <div className="proposal__item">
+          <strong dir="auto">{item.plan.title}</strong>
+          <span className="faint tabular">
+            {item.plan.dates
+              ? t.aiEventOn(formatShortDate(item.plan.dates[0]), formatClock(item.plan.start), formatClock(item.plan.end % (24 * 60)))
+              : `${t.aiEventRepeats(days)} · ${formatClock(item.plan.start)}–${formatClock(item.plan.end % (24 * 60))}`}
+          </span>
+        </div>
+      );
+    }
   }
 }
 
-const isNew = (i: ChangeItem) => i.kind === "goal" || i.kind === "milestone" || i.kind === "task" || i.kind === "week";
+const isNew = (i: ChangeItem) => i.kind === "goal" || i.kind === "milestone" || i.kind === "task" || i.kind === "week" || i.kind === "event";
 
 /** Inline editing for the fields a person would most likely tweak. Schedules are changed by asking in the chat. */
 function EditForm({ cs, onDone }: { cs: ChangeSet; onDone: (ops: ResolvedOperation[] | null) => void }) {
@@ -290,7 +305,7 @@ export function ProposalCard({ msg }: { msg: ChatMessage }) {
         <strong dir="auto">{cs.summary || t.aiProposalTitle}</strong>
         {msg.proposalStatus && !pending && <span className={`chip proposal__status proposal__status--${msg.proposalStatus}`}>{statusLabel[msg.proposalStatus]}</span>}
       </div>
-      {cs.items.length > 0 && <p className="muted proposal__summary tabular">{t.aiPreview(c.goals, c.milestones, c.tasks, c.updated, c.sessions, c.rescheduled)}</p>}
+      {cs.items.length > 0 && <p className="muted proposal__summary tabular">{t.aiPreview(c.goals, c.milestones, c.tasks, c.updated, c.sessions, c.rescheduled, c.events)}</p>}
       {pending && cs.touchesExisting && (
         <p className="proposal__touches">
           <CircleAlert size={14} /> {t.aiTouchesTitle}

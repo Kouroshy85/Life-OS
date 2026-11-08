@@ -33,7 +33,8 @@ export type ResolvedOperation =
   | { type: "create_task"; parent: { kind: "goal" | "milestone"; id: string } | null; task: ResolvedTask }
   | { type: "update_task"; taskId: string; changes: Partial<ResolvedTask> }
   | { type: "propose_weekly_schedule"; week: "this" | "next"; taskIds: string[]; timeOfDay: TimeOfDayPref; days: number[] }
-  | { type: "propose_reschedule"; taskId: string; targetDate: DateKey; timeOfDay: TimeOfDayPref };
+  | { type: "propose_reschedule"; taskId: string; targetDate: DateKey; timeOfDay: TimeOfDayPref }
+  | { type: "create_event"; title: string; date: DateKey; start: Minutes; end: Minutes; repeatDays: number[] };
 
 export type RejectionCode =
   | "unknown_ref"
@@ -48,7 +49,8 @@ export type RejectionCode =
   | "nothing_to_plan"
   | "no_milestone"
   | "invalid_task"
-  | "duplicate";
+  | "duplicate"
+  | "bad_time";
 
 export interface Rejection {
   type: string;
@@ -197,6 +199,17 @@ function resolve(op: Operation, aliases: AliasMap, today: DateKey): ResolvedOper
       if (!target) return reject("bad_date", op.target_date);
       if (target > addDays(today, 60)) return reject("bad_date", op.target_date);
       return { type: op.type, taskId, targetDate: target, timeOfDay: op.time_of_day };
+    }
+    case "create_event": {
+      const date = day(op.date);
+      if (isRejection(date)) return date;
+      if (!date) return reject("bad_date", op.date);
+      const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+      const start = minutes(op.start);
+      // "00:00" as an end means midnight at the end of the day.
+      const end = op.end === "00:00" ? 24 * 60 : minutes(op.end);
+      if (end <= start) return reject("bad_time", `${op.start}–${op.end}`);
+      return { type: op.type, title: op.title.trim(), date, start, end, repeatDays: [...new Set(op.repeat_days)].sort() };
     }
   }
 }

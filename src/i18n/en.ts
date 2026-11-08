@@ -832,8 +832,9 @@ export const en = {
   aiYesApply: "Yes, apply",
   aiNo: "No",
   aiDetails: "Details",
-  aiPreview: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number) =>
+  aiPreview: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number, events = 0) =>
     [
+      events ? plural(events, "appointment") : null,
       ...goals.map((g) => `goal “\u2068${g}\u2069”`),
       milestones && !goals.length ? plural(milestones, "milestone") : null,
       tasks ? plural(tasks, "task") : null,
@@ -883,11 +884,16 @@ export const en = {
   aiRejNothing: "There was nothing left to schedule.",
   aiRejNoMilestone: "That goal has no milestone to add it to.",
   aiRejInvalid: "Part of the answer couldn't be used.",
+  aiWarnEventClash: (title: string, other: string) => `“\u2068${title}\u2069” overlaps “\u2068${other}\u2069” in your plans.`,
+  aiRejBadTime: (range: string) => `The time ${range} doesn't work: it has to end after it starts.`,
+  aiEventOn: (day: string, from: string, to: string) => `${day} · ${from}–${to}`,
+  aiEventRepeats: (days: string) => `Every ${days}`,
   aiRejDuplicate: (title: string) => `“\u2068${title}\u2069” already exists, so it wasn't added again.`,
   aiStopped: "Stopped.",
   aiInvalidAnswer: "The assistant's answer couldn't be used. Try asking again in different words.",
-  aiSaved: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number) => {
+  aiSaved: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number, events = 0) => {
     const parts = [
+      events ? plural(events, "appointment") : null,
       ...goals.map((g) => `goal “\u2068${g}\u2069”`),
       milestones && !goals.length ? plural(milestones, "milestone") : null,
       tasks ? plural(tasks, "task") : null,
