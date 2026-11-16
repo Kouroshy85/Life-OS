@@ -17,6 +17,7 @@ import { parseResponse, type Rejection, type ResolvedOperation } from "./parse";
 import { responseJsonSchema, type AssistantResponse } from "./schema";
 import { partialReply } from "./streamReply";
 import { systemPrompt } from "./systemPrompt";
+import { assistantModules } from "./modules";
 
 export interface TurnInput {
   provider: LocalModelProvider;
@@ -129,7 +130,7 @@ export function userTurn(text: string, contextText: string, events: string[] = [
 export async function runTurn(input: TurnInput): Promise<TurnResult> {
   const { provider, signal } = input;
   const context = buildContext(input.source, input.kind);
-  const system = systemPrompt(input.lang, input.source.today);
+  const system = [systemPrompt(input.lang, input.source.today), ...(input.kind === "finance" || input.kind === "mixed" ? assistantModules.map((m) => m.instructions) : [])].join("\n\n");
   const jsonSchema = responseJsonSchema();
   const annotated = annotateDates(input.userText, input.source.today);
   // An appointment with a day and a time range is read in code; the model only has to word it.

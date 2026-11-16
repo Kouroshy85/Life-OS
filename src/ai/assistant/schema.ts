@@ -9,8 +9,9 @@
  */
 
 import { z } from "zod";
+import { financeOperationSchema } from "./finance";
 
-export const SCHEMA_VERSION = "2";
+export const SCHEMA_VERSION = "3";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD");
 const goalRef = z.string().regex(/^g\d{1,4}$/, "unknown goal reference");
@@ -106,7 +107,8 @@ export const createEvent = z.strictObject({
   repeat_days: z.array(z.number().int().min(0).max(6)).max(7),
 });
 
-export const operation = z.discriminatedUnion("type", [createGoal, createMilestone, createTask, updateTask, proposeWeeklySchedule, proposeReschedule, createEvent]);
+export const financeOperation = z.strictObject({ type: z.literal("finance"), command: financeOperationSchema });
+export const operation = z.discriminatedUnion("type", [createGoal, createMilestone, createTask, updateTask, proposeWeeklySchedule, proposeReschedule, createEvent, financeOperation]);
 
 export const assistantResponse = z.strictObject({
   intent: z.enum(["advice", "clarification", "propose_changes", "out_of_scope"]),

@@ -13,6 +13,7 @@ import "./styles/plans.css";
 import "./styles/relax.css";
 import "./styles/scenes.css";
 import "./styles/assistant.css";
+import "./styles/finance.css";
 import "./styles/phone.css";
 
 if (!isTauri() && import.meta.env.PROD) {

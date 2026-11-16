@@ -6,6 +6,9 @@
  */
 
 import { effortCheck, sanitizePlan, type CompiledPlan } from "../../domain/goalCompiler";
+import type { FinanceCommand, FinanceSnapshot } from "../../domain/finance/types";
+import { projectCommand } from "../../domain/finance/service";
+import { financePreview } from "./finance";
 import { planGoalSessions, type GoalSession } from "../../domain/goalPlanner";
 import { getLang, weekStartDay } from "../../domain/locale";
 import { dayBit, occursOn, weekDates } from "../../domain/plans";
@@ -18,6 +21,7 @@ import { earliestSlot, isKept, liveBlocks, prefsForTimeOfDay, proposeWeek, type 
 import type { Rejection, ResolvedOperation, ResolvedTask } from "./parse";
 
 export interface ProposalState {
+  finance?: FinanceSnapshot;
   goals: Goal[];
   milestones: Milestone[];
   projects: Project[];
@@ -36,6 +40,7 @@ export interface SlotView {
 }
 
 export type ChangeItem =
+  | { kind: "finance"; command: FinanceCommand; lines: string[] }
   | { kind: "goal"; plan: CompiledPlan; hoursPerWeek: number; sessions: GoalSession[]; placedMin: number; neededMin: number }
   | { kind: "milestone"; goalId: string; goalTitle: string; title: string; description: string; deadline: DateKey | null; tasks: ResolvedTask[] }
   | { kind: "task"; parent: { kind: "goal" | "milestone"; id: string } | null; parentTitle: string | null; task: ResolvedTask }
@@ -85,7 +90,7 @@ export function changeCounts(cs: ChangeSet): ChangeCounts {
     else if (item.kind === "task_update") c.updated += 1;
     else if (item.kind === "event") c.events += 1;
     else if (item.kind === "week") c.sessions += item.days.reduce((n, d) => n + d.blocks.filter((b) => b.kind === "task").length, 0);
-    else c.rescheduled += 1;
+    else if (item.kind === "reschedule") c.rescheduled += 1;
   }
   return c;
 }
@@ -99,6 +104,7 @@ export function fingerprint(state: ProposalState): string {
     state.plans.map((p) => `${p.id}:${p.start}:${p.end}:${p.weekdays}:${p.dates?.join("|") ?? ""}`).join(","),
     state.blocks.map((b) => `${b.id}:${b.date}:${b.start}:${b.end}:${b.state}:${b.pinned ? 1 : 0}:${b.proposed ? 1 : 0}`).join(","),
     JSON.stringify(state.prefs),
+    state.finance ? JSON.stringify(state.finance) : "",
   ].join("#");
   let h = 0x811c9dc5;
   for (let i = 0; i < parts.length; i++) {
@@ -188,11 +194,23 @@ export function buildChangeSet(
   const kept: ResolvedOperation[] = [];
   let touchesExisting = false;
   const fa = getLang() === "fa";
+  let projectedFinance = state.finance;
 
   for (const op of operations) {
     const reject = (code: Rejection["code"], detail: string) => rejected.push({ type: op.type, code, detail });
 
     switch (op.type) {
+      case "finance": {
+        if (!projectedFinance) { reject("invalid_task", "Finance is unavailable"); break; }
+        try {
+          const lines = financePreview(op.command, projectedFinance);
+          projectedFinance = projectCommand(op.command, projectedFinance, `finance-preview-${kept.length}`, "preview");
+          items.push({ kind: "finance", command: op.command, lines });
+          if (!("value" in op.command) || op.command.value.id) touchesExisting = true;
+          kept.push(op);
+        } catch (e) { reject("invalid_task", e instanceof Error ? e.message : String(e)); }
+        break;
+      }
       case "create_goal": {
         const raw = {
           title: op.title,

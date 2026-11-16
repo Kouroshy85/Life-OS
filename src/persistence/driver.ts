@@ -1,4 +1,6 @@
 export type SqlParam = string | number | null;
+/** SQLite committed in memory, but browser storage did not acknowledge the save. */
+export class DurableSaveError extends Error {}
 
 export interface SqlStatement {
   sql: string;

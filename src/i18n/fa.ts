@@ -806,7 +806,7 @@ export const fa: Dict = {
   // ---- local assistant
   navAssistant: "دستیار",
   aiEyebrow: "روی همین دستگاه",
-  aiSub: "هفته‌ات رو بچین، هدف بذار یا از گیر دربیا. تا تأیید نکنی چیزی عوض نمی‌شه.",
+  aiSub: "هفته‌ات رو بچین، امور مالی‌ت رو بررسی کن یا هدف بذار. تا تأیید نکنی چیزی عوض نمی‌شه.",
   aiClear: "پاک کردن گفتگو",
   aiClearQ: "این گفتگو پاک بشه؟",
   aiClearMsg: "پیام‌ها از این صفحه پاک می‌شن. هدف‌ها، کارها و برنامه‌هات سر جاشون می‌مونن.",
@@ -896,6 +896,7 @@ export const fa: Dict = {
   aiRejDuplicate: (title: string) => `«\u2068${title}\u2069» از قبل هست، برای همین دوباره اضافه نشد.`,
   aiStopped: "متوقف شد.",
   aiInvalidAnswer: "جواب دستیار قابل استفاده نبود. یه جور دیگه بپرس.",
+  aiFinanceSaved: (count: number) => `${count} تغییر مالی تأییدشده ذخیره شد.`,
   aiSaved: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number, events = 0) => {
     const parts = [
       events ? `${num(events)} قرار` : null,
@@ -927,6 +928,8 @@ export const fa: Dict = {
   qpOverwhelmedMsg: "خیلی بهم فشار اومده. کمکم کن ببینم رو چی تمرکز کنم.",
   qpReview: "پیشرفتم رو مرور کن",
   qpReviewMsg: "بیا با هم پیشرفتم رو مرور کنیم.",
+  qpFinance: "هزینه‌هام رو بررسی کن",
+  qpFinanceMsg: "هزینه‌های این ماهم رو با ماه قبل مقایسه کن و میزان مصرف بودجه‌هام رو بررسی کن.",
   aiModuleTitle: "دستیار هوش مصنوعی",
   aiModuleHint: "یه دستیار برنامه‌ریزی اختیاری که کاملاً روی همین کامپیوتر کار می‌کنه، بدون حساب و اینترنت. Life OS بدون اون هم کامل کار می‌کنه.",
   aiModuleUnavailable: "این دستگاه نمی‌تونه دستیار محلی رو اجرا کنه. تو نسخه‌ی ویندوز هست.",

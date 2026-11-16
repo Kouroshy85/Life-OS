@@ -13,6 +13,7 @@ import type { ChangeSet, ProposalState } from "./proposals";
 import type { ResolvedTask } from "./parse";
 
 export interface AppliedCounts {
+  finance?: number;
   goals: string[];
   /** Ids of goals created, so the chat can link to them. */
   goalIds: string[];
@@ -52,6 +53,11 @@ export function changeSetStatements(
 
   for (const item of cs.items) {
     switch (item.kind) {
+      case "finance":
+        // The Finance repository revalidates these commands inside its serialized
+        // approval queue and batches them atomically with the planning statements.
+        counts.finance = (counts.finance ?? 0) + 1;
+        break;
       case "goal": {
         const { goalId, statements: goalStatements } = repo.goalPlanStatements(item.plan, { sortOrder: goalOrder++ });
         statements.push(...goalStatements);

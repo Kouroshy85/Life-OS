@@ -1,6 +1,6 @@
 [package]
 name = "life-os"
-version = "1.6.2"
+version = "1.7.0"
 license = "MIT"
 description = "Life OS — local-first personal planning"
 edition = "2021"
