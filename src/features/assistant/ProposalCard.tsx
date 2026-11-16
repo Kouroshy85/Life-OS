@@ -10,6 +10,7 @@ import { applyProposal, cancelProposal, editProposal } from "../../state/assista
 import { useApp } from "../../state/store";
 import { NumberInput, TextInput } from "../../ui/fields";
 import { Button, Field } from "../../ui/primitives";
+import { f } from "../finance/copy";
 
 const WEEKDAY_SHORT = () => t.weekdays;
 
@@ -64,6 +65,8 @@ function ItemView({ item }: { item: ChangeItem }) {
   const tasks = useApp((s) => s.tasks);
   const titleOf = (id: string | null) => tasks.find((x) => x.id === id)?.title ?? "";
   switch (item.kind) {
+    case "finance":
+      return <div className="proposal__item"><strong>{f("Finance change · requires approval", "تغییر مالی · نیازمند تأیید")}</strong><ul>{item.lines.map((line, i) => <li key={i} dir="auto">{line}</li>)}</ul></div>;
     case "goal":
       return (
         <div className="proposal__item">
@@ -305,7 +308,8 @@ export function ProposalCard({ msg }: { msg: ChatMessage }) {
         <strong dir="auto">{cs.summary || t.aiProposalTitle}</strong>
         {msg.proposalStatus && !pending && <span className={`chip proposal__status proposal__status--${msg.proposalStatus}`}>{statusLabel[msg.proposalStatus]}</span>}
       </div>
-      {cs.items.length > 0 && <p className="muted proposal__summary tabular">{t.aiPreview(c.goals, c.milestones, c.tasks, c.updated, c.sessions, c.rescheduled, c.events)}</p>}
+      {cs.items.some((i) => i.kind !== "finance") && <p className="muted proposal__summary tabular">{t.aiPreview(c.goals, c.milestones, c.tasks, c.updated, c.sessions, c.rescheduled, c.events)}</p>}
+      {cs.items.some((i) => i.kind === "finance") && <div className="proposal__section">{cs.items.filter((i) => i.kind === "finance").map((item, i) => <ItemView key={i} item={item} />)}</div>}
       {pending && cs.touchesExisting && (
         <p className="proposal__touches">
           <CircleAlert size={14} /> {t.aiTouchesTitle}

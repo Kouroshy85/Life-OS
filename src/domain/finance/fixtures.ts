@@ -1,0 +1,7 @@
+/** Test fixtures only; the application never seeds financial records. */
+import { emptyFinance, type Account, type Category, type FinanceSnapshot, type Transaction } from "./types";
+export const financeAccount = (id: string, extra: Partial<Account> = {}): Account => ({ id, name: id, type: "bank", currency: "USD", scale: 2, openingMinor: 10000, description: "", archived: false, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z", ...extra });
+export const financeCategory = (id: string, type: "income" | "expense"): Category => ({ id, type, name: id, icon: "wallet", color: null, archived: false, createdAt: "x", updatedAt: "x" });
+export const financeTransaction = (extra: Partial<Transaction> = {}): Transaction => ({ id: "t1", type: "expense", amountMinor: 1000, currency: "USD", scale: 2, accountId: "a1", destinationId: null, categoryId: "food", date: "2026-11-14", description: "Lunch", notes: "", createdAt: "2026-11-14T12:00:00Z", updatedAt: "2026-11-14T12:00:00Z", ...extra });
+export function financeState(): FinanceSnapshot { return { ...emptyFinance(), accounts: [financeAccount("a1"), financeAccount("a2", { openingMinor: 0 })], categories: [financeCategory("food", "expense"), financeCategory("salary", "income")] }; }
+export const draft = <T extends { createdAt: string; updatedAt: string }>(row: T): Omit<T, "createdAt" | "updatedAt"> => { const { createdAt: _c, updatedAt: _u, ...value } = row; return value; };

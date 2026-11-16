@@ -5,14 +5,17 @@
  */
 
 import { freeTimes } from "../../domain/availability";
+import type { FinanceSnapshot } from "../../domain/finance/types";
+import { matchingModules } from "./modules";
 import { weekStartDay } from "../../domain/locale";
 import { occursOn, weekDates } from "../../domain/plans";
 import { addDays, weekdayOf } from "../../domain/time";
 import type { DateKey, Goal, Milestone, Plan, Preferences, ScheduleBlock, Task, TaskEvent } from "../../domain/types";
 
-export type RequestKind = "week" | "day" | "goal" | "study" | "overwhelmed" | "review" | "general";
+export type RequestKind = "week" | "day" | "goal" | "study" | "overwhelmed" | "review" | "general" | "finance" | "mixed";
 
 export interface ContextSource {
+  finance?: FinanceSnapshot;
   goals: Goal[];
   milestones: Milestone[];
   tasks: Task[];
@@ -27,6 +30,7 @@ export interface ContextSource {
 
 /** Alias ↔ id, so the model never sees or invents database ids. */
 export interface AliasMap {
+  finance?: Record<string, string>;
   goals: Record<string, string>;
   milestones: Record<string, string>;
   tasks: Record<string, string>;
@@ -45,6 +49,7 @@ const LIMITS = { goals: 8, milestones: 16, tasks: 40, blocks: 40, events: 20 };
 export function classifyRequest(text: string): RequestKind {
   const t = text.toLowerCase();
   const has = (...words: string[]) => words.some((w) => t.includes(w));
+  if (matchingModules(text).length) return /plan my week|organiz(e|ing)|organis(e|ing)|schedule|برنامه.*هفته|برنامه‌ریزی.*هدف/i.test(text) ? "mixed" : "finance";
   if (has("overwhelm", "stressed", "too much", "burn out", "burnout", "anxious", "خسته", "استرس", "نمی‌کشم", "نمیکشم", "زیادیه", "کلافه")) return "overwhelmed";
   if (has("exam", "study", "test ", "quiz", "university", "course", "امتحان", "درس", "کنکور", "دانشگاه", "آزمون")) return "study";
   if (has("progress", "review", "how am i doing", "پیشرفت", "مرور", "بررسی")) return "review";
@@ -65,6 +70,9 @@ const quote = (s: string) => JSON.stringify(s.replace(/\s+/g, " ").trim().slice(
 
 export function buildContext(src: ContextSource, kind: RequestKind): BuiltContext {
   const aliases: AliasMap = { goals: {}, milestones: {}, tasks: {} };
+  const moduleContext = (kind === "finance" || kind === "mixed") ? matchingModules("finance").map((m) => m.context(src)).filter((c) => c !== null) : [];
+  for (const context of moduleContext) aliases.finance = { ...aliases.finance, ...context.aliases };
+  if (kind === "finance") return { aliases, text: moduleContext.length ? moduleContext.map((c) => c.text).join("\n") : `Today ${src.today}. Finance data is unavailable. Ask the user to open Finance; do not invent financial facts.` };
   const goalAlias = new Map<string, string>();
   const milestoneAlias = new Map<string, string>();
   const taskAlias = new Map<string, string>();
@@ -212,5 +220,5 @@ export function buildContext(src: ContextSource, kind: RequestKind): BuiltContex
     lines.push(`Last 7 days: ${done} tasks completed, ${skipped} skipped, ${overran} ran over time.`);
   }
 
-  return { text: lines.join("\n"), aliases };
+  return { text: [...lines, ...moduleContext.map((c) => c.text)].join("\n"), aliases };
 }

@@ -1,0 +1,4 @@
+import { getLang } from "../../domain/locale";
+export const f = (en: string, fa: string) => getLang() === "fa" ? fa : en;
+export const sectionNames = () => ({ overview: f("Overview", "نمای کلی"), transactions: f("Transactions", "تراکنش‌ها"), accounts: f("Accounts", "حساب‌ها"), budgets: f("Budgets", "بودجه‌ها"), goals: f("Savings goals", "اهداف پس‌انداز"), reports: f("Reports", "گزارش‌ها"), settings: f("Categories & settings", "دسته‌بندی و تنظیمات") });
+export const typeName = (type: string) => ({ income: f("Income", "درآمد"), expense: f("Expense", "هزینه"), transfer: f("Transfer", "انتقال"), cash: f("Cash", "نقدی"), bank: f("Bank", "بانکی"), savings: f("Savings", "پس‌انداز"), wallet: f("Digital wallet", "کیف پول دیجیتال"), other: f("Other", "سایر"), active: f("Active", "فعال"), completed: f("Completed", "تکمیل‌شده"), archived: f("Archived", "بایگانی‌شده") }[type] ?? type);

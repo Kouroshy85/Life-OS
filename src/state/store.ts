@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { financeRepository, initFinance, refreshFinance, useFinance } from "./finance";
+import { financeFingerprint } from "../persistence/financeRepository";
 import { compilePlan, type CompileOutcome } from "../ai/planProvider";
 import { compileGoal, type CompiledPlan, type GoalRequest } from "../domain/goalCompiler";
 import type { Trigger } from "../domain/explain";
@@ -28,7 +30,7 @@ import type {
   TaskStatus,
 } from "../domain/types";
 import { audioStore } from "../persistence/audioStore";
-import { isTauri, openDefaultDriver, type SqlStatement } from "../persistence/driver";
+import { DurableSaveError, isTauri, openDefaultDriver, type SqlStatement } from "../persistence/driver";
 import { migrate } from "../persistence/migrations";
 import { makePlan, makeTask, newId, nowIso, Repository, type AiSettings, type Snapshot } from "../persistence/repository";
 import {
@@ -44,7 +46,7 @@ import {
   type Clock,
 } from "./planning";
 
-export type View = "today" | "week" | "goals" | "planner" | "dreams" | "settings" | "assistant";
+export type View = "today" | "week" | "goals" | "planner" | "dreams" | "settings" | "assistant" | "finance";
 export type PlannerMode = "plans" | "day";
 
 export interface Toast {
@@ -275,6 +277,7 @@ async function open() {
     const driver = await openDefaultDriver();
     await migrate(driver);
     repo = new Repository(driver);
+    await initFinance(driver);
     const [snap, location] = await Promise.all([repo.loadSnapshot(), repo.location()]);
     const lang: Lang = snap.flags.language === "fa" ? "fa" : snap.flags.language === "en" ? "en" : getLang();
     applyLang(lang);
@@ -453,7 +456,7 @@ export const repository = () => R();
 /** Everything a change set is built from and checked against. */
 export function proposalState(): ProposalState {
   const s = get();
-  return { goals: s.goals, milestones: s.milestones, projects: s.projects, tasks: s.tasks, plans: s.plans, blocks: s.blocks, commitments: s.commitments, skips: s.skips, prefs: s.prefs };
+  return { goals: s.goals, milestones: s.milestones, projects: s.projects, tasks: s.tasks, plans: s.plans, blocks: s.blocks, commitments: s.commitments, skips: s.skips, prefs: s.prefs, finance: useFinance.getState().data };
 }
 
 export type ApplyOutcome =
@@ -466,6 +469,8 @@ export type ApplyOutcome =
  * preview was made, nothing is saved and a fresh preview comes back instead.
  */
 export async function applyAssistantChangeSet(cs: ChangeSet): Promise<ApplyOutcome> {
+  // Refresh financial facts before checking staleness; a displayed card is never authority to bypass validation.
+  if (cs.operations.some((op) => op.type === "finance")) await refreshFinance();
   const s = get();
   const state = proposalState();
   if (isStale(cs, state)) {
@@ -474,11 +479,19 @@ export async function applyAssistantChangeSet(cs: ChangeSet): Promise<ApplyOutco
   try {
     const r = R();
     const { statements, counts } = changeSetStatements(r, cs, state, s.clock.today);
-    await r.run(statements);
+    const commands = cs.operations.flatMap((op) => op.type === "finance" ? [op.command] : []);
+    if (commands.length) {
+      const data = await financeRepository().commit(commands, financeFingerprint(state.finance!), statements);
+      useFinance.setState({ data });
+    } else await r.run(statements);
     await refresh();
     return { status: "applied", counts };
   } catch (e) {
     await refresh().catch(() => undefined);
+    if (e instanceof DurableSaveError && cs.operations.some((op) => op.type === "finance")) {
+      await refreshFinance().catch(() => undefined);
+      useFinance.setState({ needsSaveRetry: true, error: e.message });
+    }
     return { status: "failed", message: e instanceof Error ? e.message : String(e) };
   }
 }

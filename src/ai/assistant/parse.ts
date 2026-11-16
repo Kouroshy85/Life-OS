@@ -7,6 +7,8 @@
  */
 
 import { addDays, isValidDateKey } from "../../domain/time";
+import type { FinanceCommand } from "../../domain/finance/types";
+import { resolveFinanceCommand } from "./finance";
 import type { DateKey, Energy, Minutes, Priority } from "../../domain/types";
 import type { AliasMap } from "./context";
 import { assistantResponse, type AssistantResponse, type Operation, type TaskDraft, type TimeOfDayPref } from "./schema";
@@ -21,6 +23,7 @@ export interface ResolvedTask {
 }
 
 export type ResolvedOperation =
+  | { type: "finance"; command: FinanceCommand }
   | {
       type: "create_goal";
       title: string;
@@ -121,6 +124,10 @@ function resolve(op: Operation, aliases: AliasMap, today: DateKey): ResolvedOper
   };
 
   switch (op.type) {
+    case "finance": {
+      try { return { type: "finance", command: resolveFinanceCommand(op.command, aliases.finance ?? {}) }; }
+      catch { return reject("unknown_ref", "Finance reference"); }
+    }
     case "create_goal": {
       const targetDate = day(op.target_date, false);
       if (isRejection(targetDate)) return targetDate;

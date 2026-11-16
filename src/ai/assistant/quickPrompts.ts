@@ -1,7 +1,7 @@
 import { t } from "../../i18n";
 import type { RequestKind } from "./context";
 
-export type QuickPromptId = "week" | "goal" | "exam" | "day" | "overwhelmed" | "review";
+export type QuickPromptId = "week" | "goal" | "exam" | "day" | "overwhelmed" | "review" | "finance";
 
 export interface QuickPrompt {
   id: QuickPromptId;
@@ -19,4 +19,5 @@ export const QUICK_PROMPTS: QuickPrompt[] = [
   { id: "day", kind: "day", label: () => t.qpDay, message: () => t.qpDayMsg },
   { id: "overwhelmed", kind: "overwhelmed", label: () => t.qpOverwhelmed, message: () => t.qpOverwhelmedMsg },
   { id: "review", kind: "review", label: () => t.qpReview, message: () => t.qpReviewMsg },
+  { id: "finance", kind: "finance", label: () => t.qpFinance, message: () => t.qpFinanceMsg },
 ];

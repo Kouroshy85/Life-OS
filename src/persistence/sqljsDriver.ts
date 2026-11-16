@@ -1,6 +1,7 @@
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { checkBackup, type BackupCheck } from "./backup";
 import type { SqlDriver, SqlParam, SqlStatement } from "./driver";
+import { DurableSaveError } from "./driver";
 
 /**
  * SQLite compiled to WebAssembly. Used when the UI runs in a plain browser
@@ -17,11 +18,16 @@ export function createSqlJsDriver(
     const bytes = db.export();
     // export() reopens the database, which resets per-connection pragmas.
     db.run("PRAGMA foreign_keys = ON;");
-    saving = saving.then(() => opts.persist!(bytes)).catch((e) => console.error("Persist failed", e));
-    lastSave = saving;
-    return saving;
+    const attempt = saving.then(() => opts.persist!(bytes)).catch((e) => {
+      throw new DurableSaveError(`Changes are in memory, but saving to this device failed: ${e instanceof Error ? e.message : String(e)}. Keep Life OS open and retry saving to this device.`);
+    });
+    // Keep the queue usable after failure, but never report a failed durable save as success.
+    saving = attempt.catch(() => undefined);
+    lastSave = attempt;
+    return attempt;
   };
   db.run("PRAGMA foreign_keys = ON;");
+  if (opts.persist) retryPersistence = persist;
 
   return {
     engine: opts.engine ?? "SQLite (WebAssembly)",
@@ -59,6 +65,12 @@ export function createSqlJsDriver(
 
 let sqlPromise: Promise<SqlJsStatic> | null = null;
 let lastSave: Promise<void> = Promise.resolve();
+let retryPersistence: (() => Promise<void>) | null = null;
+/** Retries durability without executing the original transaction a second time. */
+export async function retryBrowserPersistence(): Promise<void> {
+  if (!retryPersistence) throw new Error("No browser database is open.");
+  await retryPersistence();
+}
 /** Set while a backup is being restored, so the open database can't save over it. */
 let frozen = false;
 

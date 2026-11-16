@@ -6,6 +6,7 @@
  */
 
 import { create } from "zustand";
+import { useFinance } from "./finance";
 import { buildChangeSet, type ChangeSet } from "../ai/assistant/proposals";
 import { classifyRequest, type ContextSource, type RequestKind } from "../ai/assistant/context";
 import { confirmationIntent } from "../ai/assistant/confirm";
@@ -63,6 +64,7 @@ export const useSelectedModel = () => useApp((s) => s.flags["ai.model"] || DEFAU
 function contextSource(): ContextSource {
   const s = useApp.getState();
   return {
+    finance: useFinance.getState().data,
     goals: s.goals,
     milestones: s.milestones,
     tasks: s.tasks,
@@ -192,11 +194,14 @@ export async function sendMessage(text: string, kind?: RequestKind) {
   }
 
   const lang = hasPersian(clean) ? "fa" : getLang() === "fa" && !/[a-z]{3,}/i.test(clean) ? "fa" : "en";
+  const classified = kind ?? classifyRequest(clean);
+  const previousUser = [...history].reverse().find((m) => m.role === "user");
+  const routedKind = classified === "general" && previousUser && ["finance", "mixed"].includes(classifyRequest(previousUser.content)) ? classifyRequest(previousUser.content) : classified;
   const result = await runTurn({
     provider,
     history,
     userText: clean,
-    kind: kind ?? classifyRequest(clean),
+    kind: routedKind,
     source: contextSource(),
     lang,
     recentEvents: events,

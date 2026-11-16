@@ -5,6 +5,7 @@ import { t } from "../../i18n";
 import { navigate, openComposer, openRelaxPicker, setDrawerOpen, setLanguage, setPlannerMode, useApp, type View } from "../../state/store";
 import { LiquidGlass } from "../../ui/LiquidGlass";
 import { isTauri } from "../../persistence/driver";
+import { IranUnitSwitch } from "../finance/IranUnitSwitch";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
 const NAV: { view: View; label: () => string; icon: typeof Sun; key: string }[] = [
@@ -72,10 +73,9 @@ export function Sidebar() {
           </li>
         ))}
         <li>
-          <button type="button" className="navitem navitem--off" disabled title={t.soon}>
+          <button type="button" className={`navitem ${view === "finance" ? "navitem--active" : ""}`} aria-current={view === "finance" ? "page" : undefined} onClick={() => navigate("finance")} title={`${t.navFinancial} (Ctrl+5)`}>
             <Wallet size={18} strokeWidth={1.8} />
             <span className="sidebar__label">{t.navFinancial}</span>
-            <span className="navitem__soon">{t.soon}</span>
           </button>
         </li>
         <li>
@@ -128,6 +128,7 @@ export function Sidebar() {
         </div>
       )}
 
+      <IranUnitSwitch />
       <ThemeSwitcher />
 
       <button

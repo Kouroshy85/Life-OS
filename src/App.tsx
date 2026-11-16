@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AssistantView } from "./features/assistant/AssistantView";
 import { DreamsView } from "./features/dreams/DreamsView";
 import { GoalsView } from "./features/goals/GoalsView";
+import { FinanceView } from "./features/finance/FinanceView";
 import { GoalWizard } from "./features/goals/GoalWizard";
 import { PlannerView } from "./features/planner/PlannerView";
 import { PlansView } from "./features/planner/PlansView";
@@ -62,6 +63,7 @@ export default function App() {
         "2": () => navigate("week"),
         "3": () => navigate("planner"),
         "4": () => navigate("goals"),
+        "5": () => navigate("finance"),
         ",": () => navigate("settings"),
         n: () => openComposer(true),
       };
@@ -121,6 +123,7 @@ export default function App() {
           {view === "dreams" && <DreamsView />}
           {view === "settings" && <SettingsView />}
           {view === "assistant" && <AssistantView />}
+          {view === "finance" && <FinanceView />}
           <p className="credit">{t.madeBy}</p>
         </main>
         <TabBar />

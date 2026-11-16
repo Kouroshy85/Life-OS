@@ -526,7 +526,7 @@ export const en = {
   // ---- navbar
   navHome: "Home",
   navWeek: "This week's plan",
-  navFinancial: "Financial",
+  navFinancial: "Finance",
   navRelax: "Relax",
   navDreams: "My dreams",
   soon: "Soon",
@@ -801,7 +801,7 @@ export const en = {
   // ---- local assistant
   navAssistant: "Assistant",
   aiEyebrow: "On this device",
-  aiSub: "Plan your week, set goals or get unstuck. Nothing changes until you approve it.",
+  aiSub: "Plan your week, explore your finances or set goals. Nothing changes until you approve it.",
   aiClear: "Clear conversation",
   aiClearQ: "Clear this conversation?",
   aiClearMsg: "The messages disappear from this screen. Your goals, tasks and plans stay as they are.",
@@ -891,6 +891,7 @@ export const en = {
   aiRejDuplicate: (title: string) => `“\u2068${title}\u2069” already exists, so it wasn't added again.`,
   aiStopped: "Stopped.",
   aiInvalidAnswer: "The assistant's answer couldn't be used. Try asking again in different words.",
+  aiFinanceSaved: (count: number) => `Saved ${count} approved finance change${count === 1 ? "" : "s"}.`,
   aiSaved: (goals: string[], milestones: number, tasks: number, updated: number, sessions: number, rescheduled: number, events = 0) => {
     const parts = [
       events ? plural(events, "appointment") : null,
@@ -922,6 +923,8 @@ export const en = {
   qpOverwhelmedMsg: "I'm feeling overwhelmed. Help me figure out what to focus on.",
   qpReview: "Review my progress",
   qpReviewMsg: "Review my progress with me.",
+  qpFinance: "Review my spending",
+  qpFinanceMsg: "Compare my spending this month with last month and review my budget usage.",
   aiModuleTitle: "AI assistant",
   aiModuleHint: "An optional planning assistant that runs entirely on this computer, with no account or internet. Life OS works fully without it.",
   aiModuleUnavailable: "This device can't run the local assistant. It's available in the Windows app.",
