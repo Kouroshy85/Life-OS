@@ -140,7 +140,7 @@ Turn it on in **Settings → AI assistant**. It's a planning chat that runs enti
 
 ## Web app
 
-Open **https://kouroshy85.github.io/Life-OS/** in any modern browser. On iPhone, iPad and Mac, use Safari and add it to your Home Screen or Dock. It then opens like an app and works offline.
+Open [Life OS](https://kouroshy85.github.io/Life-OS/) in a modern browser. The first launch needs an internet connection so the app can cache its files. Once cached, you can open Life OS and use its local features offline, including Finance.
 
 The web app keeps your data in the browser that opened it, so it doesn't sync between devices or browsers. Browsers can clear a site's data, and Safari does so after 7 days without a visit for sites that aren't on the Home Screen, so use **Settings → Data → Download a backup** now and then. Backups don't include music files.
 
@@ -148,9 +148,9 @@ The **Web app** workflow builds and publishes it to GitHub Pages whenever `main`
 
 ## Android
 
-Download the APK from the [latest release](https://github.com/Kouroshy85/Life-OS/releases/latest) and allow installing from unknown sources when Android asks. It needs Android 7 or newer. Data stays on each device, so the phone and PC don't share plans.
+The [1.7.0 release](https://github.com/Kouroshy85/Life-OS/releases/tag/v1.7.0) includes an APK for Android 7 or newer. For the current version on Android, open the web app. Data stays on each device.
 
-On phones, the app has a side menu and a bottom bar for New goal, Home and Week. The weekly plan shows one day at a time, and Relax swaps the timer and music player in the centre of the screen. **Settings → Reduce animations and graphics** helps on older phones.
+On phones, the app has a side menu and a bottom bar for New goal, Home, Week, and Finance. The weekly plan shows one day at a time, and Relax swaps the timer and music player in the centre of the screen. **Settings → Reduce animations and graphics** helps on older phones.
 
 To build it you need a JDK, the Android SDK and NDK, and `rustup target add aarch64-linux-android armv7-linux-androideabi`. Then run:
 
@@ -162,9 +162,7 @@ On Windows, Tauri creates a symbolic link during this build, which needs Develop
 
 ## iPhone
 
-iPhones only install apps signed through an Apple account, so the IPA in each release can't be installed directly from GitHub. Sign and install it from a computer, for example with Sideloadly and an Apple ID. With a free Apple ID, the app stops opening after 7 days until it's installed again.
-
-Apple's tools only run on macOS, so the **iOS build** workflow in GitHub Actions builds the IPA on a Mac runner.
+In Safari, open [Life OS](https://kouroshy85.github.io/Life-OS/) and choose **Share → Add to Home Screen**. Enable **Open as Web App** if offered, then tap **Add**. Launch it from the Home Screen once while online to prepare it for offline use. The same link also works directly in Safari.
 
 ## License
 

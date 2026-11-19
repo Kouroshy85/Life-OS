@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { csv, transactionsCsv } from "./export";
 import { draft, financeAccount, financeState, financeTransaction } from "./fixtures";
-import { currencyScale, decimalMoney, formatMoney, parseMoney, sumMoney } from "./money";
+import { currencyScale, decimalMoney, formatMoney, formatMoneyInput, parseMoney, parseMoneyInput, sumMoney } from "./money";
 import { accountBalance, balancesByCurrency, budgetUsage, checkDate, goalProgress, monthRange, previousRange, projectCommand, summary, validateCommand } from "./service";
 import type { Budget, SavingsGoal } from "./types";
 
 describe("exact monetary values", () => {
   it("keeps rial/toman display and entry exact, including a single rial", () => {
-    expect(formatMoney(12345, "IRR", "en-US", "toman")).toContain("1,234.5");
-    expect(formatMoney(1, "IRR", "fa-IR", "toman")).toContain("۰٫۱");
+    expect(formatMoney(12345, "IRR", "en-US", "toman")).toContain("1.234,5");
+    expect(formatMoney(1, "IRR", "fa-IR", "toman")).toContain("0,1");
     expect(parseMoney("۱۲۳۴٫۵", "IRR", "fa-IR", 1)).toBe(12345);
     expect(() => parseMoney("1.23", "IRR", "en-US", 1)).toThrow();
     expect(financeState().currency).toBe("IRR");
@@ -30,11 +30,20 @@ describe("exact monetary values", () => {
   it("round trips the maximum safe minor value and keeps localized fractions exact", () => {
     const max = Number.MAX_SAFE_INTEGER;
     expect(parseMoney(decimalMoney(max, 2), "USD")).toBe(max);
-    expect(formatMoney(max, "USD", "en-US")).toBe("$90,071,992,547,409.91");
-    expect(formatMoney(-1, "USD", "en-US")).toBe("-$0.01");
-    expect(formatMoney(18014398509481982n, "USD", "en-US")).toBe("$180,143,985,094,819.82");
-    expect(formatMoney(1234, "KWD", "en-US")).toContain("1.234");
-    expect(formatMoney(123456, "USD", "fa-IR")).toContain("۵۶");
+    expect(formatMoney(max, "USD", "en-US")).toBe("$90.071.992.547.409,91");
+    expect(formatMoney(-1, "USD", "en-US")).toBe("-$0,01");
+    expect(formatMoney(18014398509481982n, "USD", "en-US")).toBe("$180.143.985.094.819,82");
+    expect(formatMoney(1234, "KWD", "en-US")).toContain("1,234");
+    expect(formatMoney(123456, "USD", "fa-IR")).toBe("$1.234,56");
+  });
+  it("round trips dot grouping and the decimal comma without changing stored units", () => {
+    expect(formatMoney(3000000, "IRR", "fa-IR", "toman")).toBe("300.000 تومان");
+    expect(parseMoneyInput("300.000", "IRR", 1)).toBe(3000000);
+    expect(parseMoneyInput("۳۰۰٬۰۰۰٫۱", "IRR", 1)).toBe(3000001);
+    expect(parseMoneyInput(formatMoneyInput(-123456, 2), "USD")).toBe(-123456);
+    expect(parseMoneyInput("1,234.56", "USD")).toBe(123456);
+    expect(() => parseMoneyInput("1.23.45", "USD")).toThrow();
+    expect(() => parseMoneyInput("0.001", "USD")).toThrow();
   });
   it("uses integer arithmetic and rejects aggregate overflow", () => {
     expect(sumMoney([10, 20, -1])).toBe(29);

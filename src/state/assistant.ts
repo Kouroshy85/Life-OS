@@ -1,3 +1,4 @@
+import { APP_TIME_ZONE } from "../domain/calendar";
 /**
  * State for the local planning assistant: the conversation, streaming text, the
  * model's status, and the confirm/cancel flow for proposals. Only a confirmed
@@ -74,7 +75,7 @@ function contextSource(): ContextSource {
     prefs: s.prefs,
     today: s.clock.today,
     nowMin: s.clock.nowMin,
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "local",
+    timeZone: APP_TIME_ZONE,
   };
 }
 

@@ -8,7 +8,7 @@
 
 import { hasLetters } from "./text";
 import { FA_LABEL, FA_MATCH, FA_TECH, faTemplate, normalizeFa } from "./goalTemplates.fa";
-import { getLang, hasPersian, toFaDigits, type Lang } from "./locale";
+import { getLang, hasPersian, num, type Lang } from "./locale";
 import { addDays, daysBetween, isValidDateKey } from "./time";
 import type { DateKey, Energy, Minutes, PlanSource, Priority } from "./types";
 
@@ -632,14 +632,14 @@ export function effortCheck(input: { totalMin: Minutes; hoursPerWeek: number; ta
   const weeks = Math.max(1, Math.round(neededDays / 7));
   notes.push(
     fa
-      ? toFaDigits(`حدود ${Math.round(totalMin / 60)} ساعت کار داره. با هفته‌ای ${hoursPerWeek} ساعت، حدوداً ${weeks} هفته طول می‌کشه.`)
+      ? num(`حدود ${Math.round(totalMin / 60)} ساعت کار داره. با هفته‌ای ${hoursPerWeek} ساعت، حدوداً ${weeks} هفته طول می‌کشه.`)
       : `Estimated effort ≈ ${Math.round(totalMin / 60)}h. At ${hoursPerWeek}h per week that takes about ${weeks} week${neededDays > 7 ? "s" : ""}.`,
   );
   const tooMuch = !!target && neededDays > spanDays;
   if (tooMuch) {
     notes.push(
       fa
-        ? toFaDigits(`این بیشتر از ${spanDays} روزیه که تا تاریخ هدفت مونده. یا وقت هفتگی رو بیشتر کن، یا چند تا کار رو حذف کن، یا تاریخ رو عقب بنداز.`)
+        ? num(`این بیشتر از ${spanDays} روزیه که تا تاریخ هدفت مونده. یا وقت هفتگی رو بیشتر کن، یا چند تا کار رو حذف کن، یا تاریخ رو عقب بنداز.`)
         : `That is more than the ${spanDays} days until your target date — consider more hours per week, trimming tasks, or a later date.`,
     );
   }

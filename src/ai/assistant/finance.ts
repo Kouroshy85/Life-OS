@@ -1,8 +1,8 @@
+import { calendarMonth, calendarParts, getCalendar, shiftCalendarMonth, shiftDate } from "../../domain/calendar";
 /** Finance owns its model context, instructions, validation and human-readable previews. */
 import { financeCommand, type FinanceCommand, type FinanceSnapshot } from "../../domain/finance/types";
-import { accountBalance, budgetUsage, goalProgress, monthRange, summary, validateCommand, projectCommand } from "../../domain/finance/service";
+import { accountBalance, budgetUsage, goalProgress, summary, validateCommand, projectCommand } from "../../domain/finance/service";
 import { currencyScale, decimalMoney, formatMoney } from "../../domain/finance/money";
-import { addDays } from "../../domain/time";
 
 export const financeOperationSchema = financeCommand;
 export const financeInstructions = `FINANCE MODULE
@@ -16,16 +16,16 @@ export function buildFinanceContext(s: FinanceSnapshot, today: string): FinanceC
   const aliases: Record<string, string> = {};
   const ref = (prefix: string, id: string) => { const existing = Object.keys(aliases).find((key) => aliases[key] === id); if (existing) return existing; const key = `${prefix}${Object.keys(aliases).length + 1}`; aliases[key] = id; return key; };
   const short = (value: string) => value.slice(0, 160);
-  const thisMonth = monthRange(today.slice(0, 7)), lastMonth = monthRange(addDays(thisMonth.start, -1).slice(0, 7));
+  const thisMonth = calendarMonth(today), lastMonth = calendarMonth(shiftDate(thisMonth.start, -1));
   const currencies = [...new Set([s.currency, ...s.accounts.map((a) => a.currency)])];
   const totals = currencies.map((currency) => ({ currency, scale: currencyScale(currency),
-    periods: [{ label: "this month", ...thisMonth }, { label: "last month", ...lastMonth }, { label: "this year to date", start: `${today.slice(0, 4)}-01-01`, end: today }].map(({ label, start, end }) => { const r = summary(s, currency, start, end); return { label, start, end, incomeMinor: r.income, expensesMinor: r.expenses, netMinor: r.net, categories: r.byCategory.slice(0, 8).map(({ category, amount }) => ({ name: short(category.name), amountMinor: amount })) }; }) }));
+    periods: [{ label: "this month", ...thisMonth }, { label: "last month", ...lastMonth }, { label: "this year to date", start: calendarMonth(shiftCalendarMonth(today, 1 - calendarParts(today, getCalendar()).month, getCalendar())).start, end: today }].map(({ label, start, end }) => { const r = summary(s, currency, start, end); return { label, start, end, incomeMinor: r.income, expensesMinor: r.expenses, netMinor: r.net, categories: r.byCategory.slice(0, 8).map(({ category, amount }) => ({ name: short(category.name), amountMinor: amount })) }; }) }));
   const accounts = s.accounts.slice(0, 20).map((a) => ({ ...a, id: ref("fa", a.id), name: short(a.name), description: undefined, createdAt: undefined, updatedAt: undefined, balanceMinor: accountBalance(s, a.id) }));
   const categories = s.categories.slice(0, 32).map((c) => ({ ...c, id: ref("fc", c.id), name: short(c.name), createdAt: undefined, updatedAt: undefined }));
   const known = (id: string | null) => id === null ? null : Object.keys(aliases).find((key) => aliases[key] === id) ?? null;
   // Only expose editable drafts when every original field fits. Truncated text must never overwrite history.
   const recent = [...s.transactions].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)).filter((t) => t.notes.length <= 160 && known(t.accountId) && (!t.destinationId || known(t.destinationId)) && (!t.categoryId || known(t.categoryId))).slice(0, 12).map((t) => ({ ...t, id: ref("ft", t.id), accountId: known(t.accountId), destinationId: known(t.destinationId), categoryId: known(t.categoryId), createdAt: undefined, updatedAt: undefined }));
-  const budgets = s.budgets.filter((b) => known(b.categoryId)).slice(0, 20).map((b) => ({ ...b, id: ref("fb", b.id), categoryId: known(b.categoryId), usage: budgetUsage(s, b, today.slice(0, 7)), createdAt: undefined, updatedAt: undefined }));
+  const budgets = s.budgets.filter((b) => known(b.categoryId)).slice(0, 20).map((b) => ({ ...b, id: ref("fb", b.id), categoryId: known(b.categoryId), usage: budgetUsage(s, b, thisMonth), createdAt: undefined, updatedAt: undefined }));
   const goals = s.goals.filter((g) => g.description.length <= 160 && (!g.accountId || known(g.accountId))).slice(0, 12).map((g) => ({ ...g, id: ref("fs", g.id), accountId: known(g.accountId), progress: goalProgress(s, g), createdAt: undefined, updatedAt: undefined }));
   return { aliases, text: `Finance facts (amounts are integer minor units, no conversion; partial lists are bounded; summaries include all records). Today ${today}. Default currency ${s.currency}.\n${JSON.stringify({ totals, accounts, categories, recentTransactions: recent, budgets, savingsGoals: goals })}` };
 }

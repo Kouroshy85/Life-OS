@@ -161,7 +161,8 @@ describe("Persian goals", () => {
     expect(titles.every((t) => /[؀-ۿ]/.test(t))).toBe(true);
     expect(titles.some((t) => t.includes("ریویو"))).toBe(true);
     expect(plan.source).toBe("template");
-    expect(plan.notes[0]).toMatch(/[۰-۹]/);
+    expect(plan.notes[0]).toMatch(/\d/);
+    expect(plan.notes[0]).not.toMatch(/[۰-۹٠-٩]/);
   });
 
   it("follows the app language for goals typed in Latin letters", () => {

@@ -6,7 +6,7 @@ import type { FinanceCommand } from "../domain/finance/types";
 import { checkBackup } from "./backup";
 import type { SqlDriver } from "./driver";
 import { FinanceRepository, financeFingerprint } from "./financeRepository";
-import { migrate, MIGRATIONS } from "./migrations";
+import { LATEST_VERSION, migrate, MIGRATIONS } from "./migrations";
 import { createMemoryDriver, createSqlJsDriver, retryBrowserPersistence } from "./sqljsDriver";
 import { DurableSaveError } from "./driver";
 
@@ -99,7 +99,7 @@ describe("finance migrations and backups", () => {
     for (const m of MIGRATIONS.filter((m) => m.version < 6)) await old.batch(m.statements.map((sql) => ({ sql })));
     await old.execute("PRAGMA user_version=5"); await old.execute("INSERT INTO settings(key,value) VALUES('existing','keep')");
     await old.execute("INSERT INTO goals(id,title,created_at,updated_at) VALUES('existing-goal','Keep goal','x','x')");
-    expect(await migrate(old)).toEqual({ from: 5, to: 6 });
+    expect(await migrate(old)).toEqual({ from: 5, to: LATEST_VERSION });
     expect(await old.select("SELECT title FROM goals WHERE id='existing-goal'")).toEqual([{ title: "Keep goal" }]);
     expect(await old.select("SELECT value FROM settings WHERE key='existing'")).toEqual([{ value: "keep" }]);
     await migrate(old); expect((await new FinanceRepository(old).load()).categories).toHaveLength(12);

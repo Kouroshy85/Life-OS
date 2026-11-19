@@ -1,3 +1,4 @@
+import { setCalendar } from "../domain/calendar";
 import { afterEach, describe, expect, it } from "vitest";
 import { encodeParts, type Part } from "../domain/explain";
 import { setLang, toLatinDigits } from "../domain/locale";
@@ -63,7 +64,7 @@ describe("translations", () => {
         const text = explain(encodeParts(p));
         expect(text.length, p.k).toBeGreaterThan(3);
         expect(text, p.k).not.toMatch(/undefined|null|NaN/);
-        if (lang === "fa") expect(text, p.k).not.toMatch(/\d/);
+        expect(text, p.k).not.toMatch(/[۰-۹٠-٩]/);
       }
     }
   });
@@ -83,19 +84,25 @@ describe("translations", () => {
 });
 
 describe("Persian formatting", () => {
-  it("uses Persian digits and words for times and durations", () => {
+  it("uses Western digits with Persian words for times and durations", () => {
     setLang("fa");
-    expect(formatClock(570)).toBe("۰۹:۳۰");
-    expect(formatDuration(45)).toBe("۴۵ دقیقه");
-    expect(formatDuration(120)).toBe("۲ ساعت");
-    expect(formatDuration(90)).toBe("۱ ساعت و ۳۰ دقیقه");
+    expect(formatClock(570)).toBe("09:30");
+    expect(formatDuration(45)).toBe("45 دقیقه");
+    expect(formatDuration(120)).toBe("2 ساعت");
+    expect(formatDuration(90)).toBe("1 ساعت و 30 دقیقه");
   });
 
   it("uses the Solar Hijri calendar", () => {
     setLang("fa");
     expect(formatLongDate("2026-10-31")).toContain("آبان");
     setLang("en");
+    expect(formatLongDate("2026-10-31")).toContain("Aban");
+    setCalendar("gregory");
     expect(formatLongDate("2026-10-31")).toContain("October");
+    setLang("fa");
+    expect(formatLongDate("2026-10-31")).toContain("اکتبر");
+    setCalendar("persian");
+    setLang("en");
   });
 
   it("accepts Persian digits when typing a time", () => {

@@ -127,6 +127,11 @@ export const en = {
   energy: { low: "Low energy", medium: "Medium", high: "Deep focus" } as Record<Energy, string>,
   percentDone: (n: number) => `${n}% complete`,
   // ---- language
+  calendarTitle: "Calendar",
+  calendarHint: "Choose how dates and months are displayed.",
+  calendarPersian: "Persian (default)",
+  calendarGregorian: "Gregorian",
+  calendarConfirm: "Confirm date",
   languageTitle: "Language",
   languageHint: "Changes the whole app. Goals you already wrote stay as you wrote them.",
   languageSwitch: "فارسی",

@@ -1,4 +1,5 @@
 import { getLang, num, toLatinDigits } from "./locale";
+import { displayDate } from "./calendar";
 import type { DateKey, Minutes } from "./types";
 
 export const DAY_MINUTES = 24 * 60;
@@ -75,15 +76,15 @@ export function roundUpTo(min: Minutes, step: number): Minutes {
 const dateLocale = () => (getLang() === "fa" ? "fa-IR" : "en-US");
 
 export function formatLongDate(key: DateKey): string {
-  return new Intl.DateTimeFormat(dateLocale(), { weekday: "long", month: "long", day: "numeric" }).format(parseDateKey(key));
+  return displayDate(key, dateLocale(), { weekday: "long", month: "long", day: "numeric" });
 }
 
 export function formatShortDate(key: DateKey): string {
-  return new Intl.DateTimeFormat(dateLocale(), { month: getLang() === "fa" ? "long" : "short", day: "numeric" }).format(parseDateKey(key));
+  return displayDate(key, dateLocale(), { month: getLang() === "fa" ? "long" : "short", day: "numeric" });
 }
 
 export function formatFullDate(key: DateKey): string {
-  return new Intl.DateTimeFormat(dateLocale(), { year: "numeric", month: getLang() === "fa" ? "long" : "short", day: "numeric" }).format(parseDateKey(key));
+  return displayDate(key, dateLocale(), { year: "numeric", month: getLang() === "fa" ? "long" : "short", day: "numeric" });
 }
 
 /** "today", "tomorrow", "in 3 days", "2 days ago", or a short date. */
@@ -99,7 +100,7 @@ export function relativeDay(key: DateKey, today: DateKey): string {
 }
 
 export function formatMonthYear(key: DateKey): string {
-  return new Intl.DateTimeFormat(dateLocale(), { month: "long", year: "numeric" }).format(parseDateKey(key));
+  return displayDate(key, dateLocale(), { month: "long", year: "numeric" });
 }
 
 /** A logical-day minute as a clock time: 1500 reads as 01:00. */

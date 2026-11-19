@@ -1,5 +1,6 @@
 import type { SqlDriver } from "./driver";
 import { financeMigration } from "./financeMigration";
+import { recurringMigration } from "./recurringMigration";
 
 /**
  * Versioned schema. Each migration runs in a single transaction together with
@@ -249,7 +250,7 @@ export const MIGRATIONS: Migration[] = [
   },
 ];
 
-MIGRATIONS.push(financeMigration);
+MIGRATIONS.push(financeMigration, recurringMigration);
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 
