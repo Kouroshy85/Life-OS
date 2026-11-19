@@ -132,6 +132,11 @@ export const fa: Dict = {
   energy: { low: "انرژی کم", medium: "انرژی متوسط", high: "تمرکز عمیق" } as Record<Energy, string>,
   percentDone: (n: number) => `${num(n)}٪ انجام شده`,
   // ---- language
+  calendarTitle: "تقویم",
+  calendarHint: "نحوه نمایش تاریخ و ماه‌ها را انتخاب کنید.",
+  calendarPersian: "شمسی (پیش‌فرض)",
+  calendarGregorian: "میلادی",
+  calendarConfirm: "تأیید تاریخ",
   languageTitle: "زبان",
   languageHint: "کل برنامه عوض می‌شه. هدفایی که خودت نوشتی همون‌جوری که نوشتی می‌مونن.",
   languageSwitch: "English",

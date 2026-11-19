@@ -1,10 +1,10 @@
-import { Database, Download, Gauge, KeyRound, Smartphone, Upload, Keyboard, Languages, Moon, Quote, RotateCcw, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
+import { CalendarDays, Database, Download, Gauge, KeyRound, Smartphone, Upload, Keyboard, Languages, Moon, Quote, RotateCcw, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { aiConfigured, aiStatusLabel, testConnection } from "../../ai/planProvider";
 import { textProblem } from "../../domain/text";
 import { t } from "../../i18n";
 import { textErrorMessage } from "../planner/PlanWizard";
-import { addQuote, deleteQuote, hiddenQuotes, setHiddenQuotes, loadSampleData, removeSampleData, resetAll, saveAi, savePrefs, setLanguage, setLite, downloadBackup, restoreBackup, useApp, validatePrefs } from "../../state/store";
+import { addQuote, deleteQuote, hiddenQuotes, setHiddenQuotes, loadSampleData, removeSampleData, resetAll, saveAi, saveCalendar, savePrefs, setLanguage, setLite, downloadBackup, restoreBackup, useApp, validatePrefs } from "../../state/store";
 import { SelectInput, TextInput, TimeInput } from "../../ui/fields";
 import { Button, Confirm, Field, IconButton, Segmented, Switch } from "../../ui/primitives";
 import { PrefsFields } from "../planner/PrefsForm";
@@ -74,6 +74,7 @@ export function SettingsView() {
   const engine = useApp((s) => s.engine);
   const location = useApp((s) => s.location);
   const lang = useApp((s) => s.lang);
+  const calendar = useApp((s) => s.flags.calendar === "gregory" ? "gregory" : "persian");
   const lite = useApp((s) => s.lite);
   const hasSample = useApp((s) => s.goals.some((g) => g.isSample) || s.tasks.some((t) => t.isSample) || s.commitments.some((c) => c.id.startsWith("sample-")));
 
@@ -115,6 +116,17 @@ export function SettingsView() {
           />
         </div>
         <p className="field__hint">{t.languageHint}</p>
+      </section>
+
+      <section className="card settings-section rise" aria-labelledby="set-calendar">
+        <h2 className="settings-section__title" id="set-calendar"><CalendarDays size={19} /> {t.calendarTitle}</h2>
+        <p className="field__hint">{t.calendarHint}</p>
+        <div className="calendar-settings">
+          {(["persian", "gregory"] as const).map((value) => <label key={value}>
+            <input type="radio" name="calendar-format" checked={calendar === value} onChange={() => void saveCalendar(value)} />
+            {value === "persian" ? t.calendarPersian : t.calendarGregorian}
+          </label>)}
+        </div>
       </section>
 
       <ThemeSection />

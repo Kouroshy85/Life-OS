@@ -2,10 +2,11 @@ import { CalendarHeart, ChevronLeft, ChevronRight, Repeat, Target } from "lucide
 import { useEffect, useMemo, useState } from "react";
 import { blockedOnCalendarDay } from "../../domain/availability";
 import { overlaps } from "../../domain/intervals";
+import { displayDate } from "../../domain/calendar";
 import { getLang, weekStartDay } from "../../domain/locale";
 import { ALL_DAYS, classifyConflicts, colorUsage, dayBit, planColor, planTimeProblem, suggestColor, weekDates, type PlanConflict } from "../../domain/plans";
 import { textProblem } from "../../domain/text";
-import { addDays, formatClock, formatDuration, formatMonthYear, formatShortDate, parseDateKey, weekdayOf } from "../../domain/time";
+import { addDays, formatClock, formatDuration, formatMonthYear, formatShortDate, weekdayOf } from "../../domain/time";
 import type { DateKey, Minutes, Plan, PlanColor, PlanType } from "../../domain/types";
 import { t } from "../../i18n";
 import { makePlan } from "../../persistence/repository";
@@ -262,7 +263,7 @@ export function PlanWizard({ open, onClose, type, plan, date }: { open: boolean;
                   }}
                 >
                   <span>{t.weekdays[w]}</span>
-                  {oneTime && <small>{new Intl.DateTimeFormat(getLang() === "fa" ? "fa-IR" : "en-US", { day: "numeric" }).format(parseDateKey(d))}</small>}
+                  {oneTime && <small>{displayDate(d, getLang() === "fa" ? "fa-IR" : "en-US", { day: "numeric" })}</small>}
                 </button>
               );
             })}

@@ -1,5 +1,6 @@
+import { appClock, setCalendar, type CalendarSystem } from "../domain/calendar";
 import { create } from "zustand";
-import { financeRepository, initFinance, refreshFinance, useFinance } from "./finance";
+import { financeRepository, initFinance, processRecurringIncome, refreshFinance, useFinance } from "./finance";
 import { financeFingerprint } from "../persistence/financeRepository";
 import { compilePlan, type CompileOutcome } from "../ai/planProvider";
 import { compileGoal, type CompiledPlan, type GoalRequest } from "../domain/goalCompiler";
@@ -14,7 +15,7 @@ import { DEFAULT_THEME, themeById, themeTokens, type ThemeId } from "../domain/t
 import { changeSetStatements, type AppliedCounts } from "../ai/assistant/apply";
 import { buildChangeSet, isStale, type ChangeSet, type ProposalState } from "../ai/assistant/proposals";
 import type { PlanColor } from "../domain/types";
-import { dateTimeKey, formatClock, formatDuration, minutesOfDay, toDateKey } from "../domain/time";
+import { dateTimeKey, formatClock, formatDuration } from "../domain/time";
 import { explain, t } from "../i18n";
 import type {
   DateKey,
@@ -146,9 +147,9 @@ function initialTheme(): ThemeId {
 
 function initialLang(): Lang {
   try {
-    return localStorage.getItem(LANG_KEY) === "fa" ? "fa" : "en";
+    return localStorage.getItem(LANG_KEY) === "en" ? "en" : "fa";
   } catch {
-    return "en";
+    return "fa";
   }
 }
 
@@ -186,10 +187,7 @@ const emptySnapshot = (): Snapshot => ({
   flags: {},
 });
 
-const readClock = (): Clock => {
-  const now = new Date();
-  return { today: toDateKey(now), nowMin: minutesOfDay(now) };
-};
+const readClock = (): Clock => appClock();
 
 let repo: Repository | null = null;
 const R = () => {
@@ -281,11 +279,13 @@ async function open() {
     const [snap, location] = await Promise.all([repo.loadSnapshot(), repo.location()]);
     const lang: Lang = snap.flags.language === "fa" ? "fa" : snap.flags.language === "en" ? "en" : getLang();
     applyLang(lang);
+    setCalendar(snap.flags.calendar === "gregory" ? "gregory" : "persian");
     const theme = snap.flags.theme ? themeById(snap.flags.theme).id : get().theme;
     applyTheme(theme);
     const lite = snap.flags.lite ? snap.flags.lite === "1" : get().lite;
     applyLite(lite);
     set({ ...snap, lang, theme, lite, status: "ready", engine: repo.engine, location, clock: readClock() });
+    void processRecurringIncome();
   } catch (e) {
     set({ status: "error", fatal: e instanceof Error ? e.message : String(e) });
   }
@@ -300,6 +300,7 @@ export function tick() {
       // Follow the day forward if the planner was showing "today".
       plannerDate: s.plannerDate === prev.today ? next.today : s.plannerDate,
     }));
+    if (get().status === "ready" && next.today !== prev.today) void processRecurringIncome();
   }
   void checkReminders();
 }
@@ -397,6 +398,13 @@ export const setHiddenQuotes = (list: string[]) => mutate(() => R().setFlag("hid
 export async function deleteNote(id: string) {
   await mutate(() => R().deleteNote(id));
   toast(t.toastNoteDeleted);
+}
+
+export async function saveCalendar(calendar: CalendarSystem) {
+  await mutate(async () => {
+    await R().setFlag("calendar", calendar);
+    setCalendar(calendar);
+  });
 }
 
 export async function setLanguage(lang: Lang) {

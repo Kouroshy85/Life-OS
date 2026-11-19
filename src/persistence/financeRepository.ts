@@ -39,9 +39,14 @@ export class FinanceRepository {
     return { state: next, statement: { sql: `INSERT INTO finance_${table}(${columns.join(",")}) VALUES(${columns.map(() => "?").join(",")})`, params } };
   }
   private queue: Promise<unknown> = Promise.resolve();
+  serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const work = this.queue.then(operation);
+    this.queue = work.catch(() => undefined);
+    return work;
+  }
   /** Serializes read/validate/write against other Finance writes, including assistant approval. */
   commit(commands: FinanceCommand[], expectedFingerprint?: string, additionalStatements: SqlStatement[] = []): Promise<FinanceSnapshot> {
-    const work = this.queue.then(async () => {
+    return this.serialize(async () => {
       let s = await this.load();
       if (expectedFingerprint !== undefined && financeFingerprint(s) !== expectedFingerprint) throw new Error("Finance data changed. Review a fresh proposal before applying it.");
       const statements: SqlStatement[] = [...additionalStatements];
@@ -49,8 +54,6 @@ export class FinanceRepository {
       await this.db.batch(statements);
       return this.load();
     });
-    this.queue = work.catch(() => undefined);
-    return work;
   }
 }
 /** Exact serialized state, rather than a collision-prone hash, guards approval staleness. */

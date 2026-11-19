@@ -105,8 +105,9 @@ export function summary(s: FinanceSnapshot, currency: string, start: string, end
   const byCategory = s.categories.map((c) => ({ category: c, amount: sumMoney(transactions.filter((t) => t.type === "expense" && t.categoryId === c.id).map((t) => t.amountMinor)) })).filter((c) => c.amount > 0).sort((a, b) => b.amount - a.amount);
   return { income, expenses, net: subtractMoney(income, expenses), byCategory, transactions };
 }
-export function budgetUsage(s: FinanceSnapshot, budget: Budget, month: string) {
-  const range = monthRange(month), start = range.start > budget.startDate ? range.start : budget.startDate;
+export function budgetUsage(s: FinanceSnapshot, budget: Budget, month: string | { start: string; end: string }) {
+  const range = typeof month === "string" ? monthRange(month) : month;
+  const start = range.start > budget.startDate ? range.start : budget.startDate;
   const end = budget.endDate && budget.endDate < range.end ? budget.endDate : range.end;
   const active = start <= end;
   const spent = sumMoney(s.transactions.filter((t) => active && t.type === "expense" && t.categoryId === budget.categoryId && t.currency === budget.currency && t.date >= start && t.date <= end).map((t) => t.amountMinor));

@@ -6,6 +6,7 @@ import { navigate, openComposer, openRelaxPicker, setDrawerOpen, setLanguage, se
 import { LiquidGlass } from "../../ui/LiquidGlass";
 import { isTauri } from "../../persistence/driver";
 import { IranUnitSwitch } from "../finance/IranUnitSwitch";
+import { FinanceNavigation, financeNavigate } from "../finance/FinanceNavigation";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
 const NAV: { view: View; label: () => string; icon: typeof Sun; key: string }[] = [
@@ -73,10 +74,11 @@ export function Sidebar() {
           </li>
         ))}
         <li>
-          <button type="button" className={`navitem ${view === "finance" ? "navitem--active" : ""}`} aria-current={view === "finance" ? "page" : undefined} onClick={() => navigate("finance")} title={`${t.navFinancial} (Ctrl+5)`}>
+          <button type="button" className={`navitem ${view === "finance" ? "navitem--active" : ""}`} aria-current={view === "finance" ? "page" : undefined} onClick={() => { financeNavigate("overview"); navigate("finance"); }} title={`${t.navFinancial} (Ctrl+5)`}>
             <Wallet size={18} strokeWidth={1.8} />
             <span className="sidebar__label">{t.navFinancial}</span>
           </button>
+          {view === "finance" && <FinanceNavigation afterNavigate={() => setDrawerOpen(false)} />}
         </li>
         <li>
           <button type="button" className="navitem" title={t.navRelax} onClick={openRelaxPicker}>

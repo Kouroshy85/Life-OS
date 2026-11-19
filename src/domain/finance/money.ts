@@ -1,3 +1,5 @@
+import { toLatinDigits } from "../locale";
+
 /** Money crosses the SQLite bridge as safe integers. Arithmetic uses bigint. */
 const LEGACY_SCALES = { USD: 2, EUR: 2, GBP: 2, IRR: 0, JPY: 0, KRW: 0, KWD: 3, BHD: 3, OMR: 3, AED: 2, CAD: 2, AUD: 2, CHF: 2, CNY: 2, INR: 2, TRY: 2, SAR: 2 } as const;
 export const CURRENCIES = { USD: 2, IRR: 0 } as const;
@@ -40,17 +42,31 @@ export function parseMoney(text: string, currency: string, locale = "en-US", dis
   if (fraction.length > scale) throw new Error(`${currency} supports ${scale} decimal places. No rounding is applied.`);
   return safeMoney(BigInt(`${whole}${fraction.padEnd(scale, "0")}`) * (negative ? -1n : 1n));
 }
+export function formatMoneyInput(minor: number | bigint, scale: number, trimFraction = false) {
+  const [whole, fraction] = decimalMoney(minor, scale).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return fraction && !(trimFraction && /^0+$/.test(fraction)) ? `${grouped},${fraction}` : grouped;
+}
+
+/** Period groups and a decimal comma are canonical for Finance entry. Also accept pasted legacy amounts. */
+export function parseMoneyInput(text: string, currency: string, scale = currencyScale(currency)): number {
+  const normalized = toLatinDigits(text.trim()).replaceAll("٬", ".").replaceAll("٫", ",");
+  const displayed = /^-?(?:\d+|[1-9]\d{0,2}(?:\.\d{3})+)(?:,(\d+))?$/.exec(normalized);
+  if (displayed && (displayed[1]?.length ?? 0) <= scale) {
+    return parseMoney(normalized.replaceAll(".", "").replace(",", "."), currency, "en-US", scale);
+  }
+  return parseMoney(normalized, currency, "en-US", scale);
+}
+
 export function formatMoney(minor: number | bigint, currency: string, locale = "en-US", iranUnit: "rial" | "toman" = "rial"): string {
-  if (typeof minor === "number") assertMinor(minor);
-  const scale = currency === "IRR" && iranUnit === "toman" ? 1 : currencyScale(currency);
-  const raw = BigInt(minor), unit = 10n ** BigInt(scale), absolute = raw < 0n ? -raw : raw;
-  const whole = absolute / unit;
-  const fraction = (absolute % unit).toString().padStart(scale, "0");
-  const digits = new Intl.NumberFormat(locale, { useGrouping: false }).format;
-  const localizedFraction = [...fraction].map((d) => digits(Number(d))).join("");
-  const value = raw < 0n ? (whole === 0n ? -0 : -whole) : whole;
-  return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: scale, maximumFractionDigits: scale }).formatToParts(value)
-    .map((p) => p.type === "currency" && currency === "IRR" ? (iranUnit === "toman" ? (locale.startsWith("fa") ? "تومان" : "tomans") : (locale.startsWith("fa") ? "ریال" : "rials")) : p.type === "fraction" ? localizedFraction : p.value).join("");
+  const toman = currency === "IRR" && iranUnit === "toman";
+  const amount = formatMoneyInput(minor, toman ? 1 : currencyScale(currency), toman);
+  if (currency === "IRR") {
+    const unit = locale.startsWith("fa") ? (toman ? "تومان" : "ریال") : (toman ? "tomans" : "rials");
+    return `${amount} ${unit}`;
+  }
+  if (currency === "USD") return amount.startsWith("-") ? `-$${amount.slice(1)}` : `$${amount}`;
+  return `${amount} ${currency}`;
 }
 /** Percentages are display-only; monetary totals never use these ratios. */
 export const percent = (amount: number, target: number) => target > 0 ? Number(BigInt(amount) * 10000n / BigInt(target)) / 100 : 0;

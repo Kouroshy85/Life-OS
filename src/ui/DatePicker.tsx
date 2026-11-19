@@ -2,37 +2,14 @@ import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getLang, num } from "../domain/locale";
-import { addDays, formatFullDate, toDateKey, weekdayOf } from "../domain/time";
+import { appClock, calendarMonth, calendarParts, calendarWeekday, getCalendar, shiftCalendarMonth, shiftDate, dateDistance } from "../domain/calendar";
+import { formatFullDate, formatMonthYear } from "../domain/time";
 import type { DateKey } from "../domain/types";
 import { t } from "../i18n";
 import { LiquidGlass } from "./LiquidGlass";
 import { useFieldId } from "./primitives";
 
-/** Year, month and day of a date in the calendar of the current language. */
-function calendarParts(key: DateKey) {
-  const calendar = getLang() === "fa" ? "persian" : "gregory";
-  const [y, m, d] = key.split("-").map(Number);
-  const parts = new Intl.DateTimeFormat(`en-u-ca-${calendar}`, { year: "numeric", month: "numeric", day: "numeric" }).formatToParts(new Date(y, m - 1, d));
-  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? "0", 10);
-  return { year: get("year"), month: get("month"), day: get("day") };
-}
-
-/** All days of the month containing `key`. Walks real dates, so it works for either calendar. */
-function monthDays(key: DateKey): DateKey[] {
-  const { day, month } = calendarParts(key);
-  const first = addDays(key, -(day - 1));
-  const days: DateKey[] = [];
-  for (let cur = first; calendarParts(cur).month === month; cur = addDays(cur, 1)) days.push(cur);
-  return days;
-}
-
-const monthTitle = (key: DateKey) =>
-  new Intl.DateTimeFormat(getLang() === "fa" ? "fa-IR" : "en-US", { year: "numeric", month: "long" }).format(new Date(`${key}T12:00:00`));
-
-/**
- * Date field that follows the app language: Solar Hijri with Persian digits in
- * Persian, Gregorian in English. Values are always stored as Gregorian date keys.
- */
+/** A calendar-aware field that always stores a Gregorian date key. */
 export function DateInput({
   value,
   onChange,
@@ -85,15 +62,18 @@ export function DateInput({
 }
 
 function Calendar({ anchor, value, required, onPick, onClose }: { anchor: HTMLElement; value: DateKey | null; required?: boolean; onPick: (v: DateKey | null) => void; onClose: () => void }) {
-  const today = toDateKey(new Date());
+  const today = appClock().today;
+  const calendar = getCalendar();
+  const [draft, setDraft] = useState(value ?? today);
   const [focusDay, setFocusDay] = useState<DateKey>(value ?? today);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const rtl = getLang() === "fa";
-  const days = monthDays(focusDay);
+  const month = calendarMonth(focusDay, calendar);
+  const days = Array.from({ length: dateDistance(month.start, month.end) + 1 }, (_, index) => shiftDate(month.start, index));
   // The Persian week starts on Saturday.
-  const weekStart = rtl ? 6 : 0;
-  const lead = (weekdayOf(days[0]) - weekStart + 7) % 7;
+  const weekStart = calendar === "persian" || rtl ? 6 : 0;
+  const lead = (calendarWeekday(days[0]) - weekStart + 7) % 7;
   const headers = Array.from({ length: 7 }, (_, i) => {
     const index = (weekStart + i) % 7;
     return { index, label: t.weekdays[index].slice(0, rtl ? 1 : 2) };
@@ -122,6 +102,13 @@ function Calendar({ anchor, value, required, onPick, onClose }: { anchor: HTMLEl
         e.stopPropagation();
         onClose();
       }
+      if (e.key === "Tab" && ref.current) {
+        const buttons = Array.from(ref.current.querySelectorAll<HTMLButtonElement>('button:not([tabindex="-1"])'));
+        const first = buttons[0];
+        const last = buttons.at(-1);
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
     };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey, true);
@@ -131,36 +118,33 @@ function Calendar({ anchor, value, required, onPick, onClose }: { anchor: HTMLEl
     };
   }, [anchor, onClose]);
 
-  const shiftMonth = (dir: 1 | -1) => {
-    const edge = dir === 1 ? addDays(days[days.length - 1], 1) : addDays(days[0], -1);
-    const target = monthDays(edge);
-    const day = calendarParts(focusDay).day;
-    setFocusDay(target[Math.min(day, target.length) - 1]);
-  };
+  const shiftMonth = (dir: 1 | -1) => setFocusDay((day) => shiftCalendarMonth(day, dir, calendar));
 
   const onGridKey = (e: React.KeyboardEvent) => {
     const step: Record<string, number> = { ArrowLeft: rtl ? 1 : -1, ArrowRight: rtl ? -1 : 1, ArrowUp: -7, ArrowDown: 7 };
     if (step[e.key]) {
       e.preventDefault();
-      setFocusDay(addDays(focusDay, step[e.key]));
+      setFocusDay(shiftDate(focusDay, step[e.key]));
     } else if (e.key === "PageUp" || e.key === "PageDown") {
       e.preventDefault();
-      shiftMonth(e.key === "PageUp" ? -1 : 1);
+      const direction = e.key === "PageUp" ? -1 : 1;
+      if (e.shiftKey) setFocusDay(shiftCalendarMonth(focusDay, direction * 12, calendar));
+      else shiftMonth(direction);
     }
   };
 
   return createPortal(
-    <LiquidGlass ref={ref} dense radius={18} strength={14} bezel={10} className="datepicker" role="dialog" aria-label={t.pickDate} style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999 }}>
+    <LiquidGlass ref={ref} dense radius={18} strength={14} bezel={10} className="datepicker datepicker--confirm" role="dialog" aria-label={t.pickDate} style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999 }}>
       <div className="datepicker__head">
         <button type="button" className="icon-btn" aria-label={t.prevMonth} onClick={() => shiftMonth(-1)}>
           <ChevronLeft size={16} className="flip-rtl" />
         </button>
-        <strong>{monthTitle(focusDay)}</strong>
+        <strong>{formatMonthYear(focusDay)}</strong>
         <button type="button" className="icon-btn" aria-label={t.nextMonth} onClick={() => shiftMonth(1)}>
           <ChevronRight size={16} className="flip-rtl" />
         </button>
       </div>
-      <div className="datepicker__grid" role="grid" onKeyDown={onGridKey}>
+      <div className="datepicker__grid" role="grid" aria-label={formatMonthYear(focusDay)} onKeyDown={onGridKey}>
         {headers.map((h) => (
           <span key={h.index} className="datepicker__dow" aria-hidden="true">
             {h.label}
@@ -176,17 +160,18 @@ function Calendar({ anchor, value, required, onPick, onClose }: { anchor: HTMLEl
             role="gridcell"
             tabIndex={d === focusDay ? 0 : -1}
             data-focus-day={d === focusDay ? "" : undefined}
-            aria-selected={d === value}
+            aria-selected={d === draft}
+            aria-current={d === today ? "date" : undefined}
             aria-label={formatFullDate(d)}
-            className={`datepicker__day tabular ${d === value ? "datepicker__day--on" : ""} ${d === today ? "datepicker__day--today" : ""}`}
-            onClick={() => onPick(d)}
+            className={`datepicker__day tabular ${d === draft ? "datepicker__day--on" : ""} ${d === today ? "datepicker__day--today" : ""} ${calendar === "persian" && calendarWeekday(d) === 5 ? "datepicker__day--holiday" : ""}`}
+            onClick={() => { setDraft(d); setFocusDay(d); }}
           >
-            {num(calendarParts(d).day)}
+            {num(calendarParts(d, calendar).day)}
           </button>
         ))}
       </div>
       <div className="datepicker__foot">
-        <button type="button" className="btn btn--ghost btn--sm" onClick={() => onPick(today)}>
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setDraft(today); setFocusDay(today); }}>
           {t.todayShort}
         </button>
         {!required && (
@@ -194,6 +179,8 @@ function Calendar({ anchor, value, required, onPick, onClose }: { anchor: HTMLEl
             {t.clearDate}
           </button>
         )}
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>{t.cancel}</button>
+        <button type="button" className="btn btn--primary btn--sm" onClick={() => onPick(draft)}>{t.calendarConfirm}</button>
       </div>
     </LiquidGlass>,
     document.body,
