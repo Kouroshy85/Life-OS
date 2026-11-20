@@ -1,10 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { contrast, hexToTriplet, readableOn, THEMES, themeById, themeTokens } from "./themes";
+import { contrast, DEFAULT_THEME, hexToTriplet, readableOn, THEMES, themeById, themeTokens } from "./themes";
 
 describe("themes", () => {
-  it("has the seven requested themes", () => {
-    expect(THEMES.map((t) => t.id)).toEqual(["default", "jungle", "shadow", "strawberry", "neutral", "sky", "wine"]);
+  it("includes Lavender and retains the saved theme IDs", () => {
+    expect(THEMES.map((t) => t.id)).toEqual(["lavender", "default", "jungle", "shadow", "strawberry", "neutral", "sky", "wine"]);
   });
 
   it("uses your exact neutral elegance colours", () => {
@@ -14,8 +14,8 @@ describe("themes", () => {
   });
 
   it("falls back to the default for unknown names", () => {
-    expect(themeById("nope").id).toBe("default");
-    expect(themeById(null).id).toBe("default");
+    expect(themeById("nope").id).toBe(DEFAULT_THEME);
+    expect(themeById(null).id).toBe(DEFAULT_THEME);
   });
 
   it("converts colours for the stylesheets", () => {

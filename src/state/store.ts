@@ -120,7 +120,7 @@ function applyTheme(id: ThemeId) {
   const theme = themeById(id);
   const root = document.documentElement;
   root.dataset.theme = theme.id;
-  root.classList.toggle("scened", theme.id !== DEFAULT_THEME);
+  root.classList.toggle("scened", theme.id !== "default" && theme.id !== "lavender");
   root.classList.toggle("lit", theme.scheme === "light");
   root.style.colorScheme = theme.scheme;
   for (const [token, value] of Object.entries(themeTokens(theme))) root.style.setProperty(token, value);

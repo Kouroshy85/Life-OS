@@ -51,7 +51,7 @@
   transition: background-color 500ms var(--ease), color 500ms var(--ease), border-color 500ms var(--ease), box-shadow 500ms var(--ease), fill 500ms var(--ease) !important;
 }
 
-/* .scened is every theme with a scene; .lit is the light ones. Default has neither.
+/* .scened marks themes with illustrated backgrounds. .lit marks light palettes.
    Panels turn solid enough that a scene never sits behind text. */
 .scened .card,
 .scened .stat,
@@ -67,10 +67,6 @@
   background-color: rgb(var(--bg-rgb) / var(--panel-alpha));
 }
 
-.scened .sidebar__new {
-  color: var(--text-on-accent);
-}
-
 /* On a light theme the glass needs a visible edge, and its hover tints need depth. */
 .lit .glass {
   box-shadow:
@@ -84,6 +80,41 @@
 :root[data-theme="neutral"],
 :root[data-theme="sky"] {
   --shadow-float: 0 22px 50px -26px rgb(var(--shadow-rgb) / 0.5), 0 2px 8px -2px rgb(var(--shadow-rgb) / 0.2);
+}
+
+:root[data-theme="lavender"] {
+  --glass-tint: rgb(var(--glass-rgb) / 0.85);
+  --glass-tint-strong: rgb(var(--glass-strong-rgb) / 0.97);
+  --line: rgb(var(--ink) / 0.10);
+  --line-strong: rgb(var(--ink) / 0.19);
+  --shadow-float: 0 14px 32px -18px rgb(var(--shadow-rgb) / 0.31), 0 2px 6px rgb(var(--shadow-rgb) / 0.08);
+  --shadow-soft: 0 2px 5px rgb(var(--shadow-rgb) / 0.045), 0 10px 20px -15px rgb(var(--shadow-rgb) / 0.25);
+}
+
+:root[data-theme="lavender"] :is(.card, .stat, .goal-tile, .plan-adder) {
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="lavender"] :is(.goal-tile, .plan-adder):hover {
+  background: color-mix(in srgb, var(--card), var(--violet-500) 5%);
+}
+
+:root[data-theme="lavender"] :is(.goal-tile, .plan-adder):focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+:root[data-theme="lavender"] :is(.btn--primary, .btn--glass, .btn--danger):not(.btn--icon, .quick-add-trigger) {
+  border-radius: var(--r-sm);
+}
+
+:root[data-theme="lavender"] .segmented__thumb {
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--selection-edge), var(--shadow-soft);
+}
+
+:root[data-theme="lavender"] .segmented__item[aria-checked="true"] {
+  color: var(--violet-300);
 }
 
 /* Motion */

@@ -981,7 +981,9 @@ export const fa: Dict = {
   // ---- phone
   menuOpen: "باز کردن منو",
   menuClose: "بستن منو",
-  tabGoal: "هدف جدید",
+  quickAdd: "افزودن سریع",
+  addTransaction: "افزودن تراکنش",
+  addIncome: "افزودن درآمد",
   tabHome: "خانه",
   tabWeek: "هفته",
   liteTitle: "کم کردن انیمیشن و گرافیک",
@@ -1005,8 +1007,8 @@ export const fa: Dict = {
   themeTitle: "تم",
   themeHint: "همه‌ی رنگ‌ها، سایه‌ها و درخشش‌های برنامه و صحنه‌ی پشتش رو عوض می‌کنه.",
   themeChange: (name: string) => `تم: ${name}. تم رو عوض کن`,
-  themeNames: { default: "پیش‌فرض", jungle: "جنگل", shadow: "سایه", strawberry: "رویای توت‌فرنگی", neutral: "شیک و ملایم", sky: "آسمون", wine: "شراب" } as Record<string, string>,
-  themeBlurbs: { default: "تقریباً سیاه با شیشه‌ی بنفش", jungle: "خاک قهوه‌ای و سبز تیره", shadow: "سیاه، سفید و سایه‌های بلند", strawberry: "صورتی و بنفش، با رنگین‌کمون", neutral: "هلویی و قهوه‌ای گرم", sky: "آبی روشن، ابر و بارون", wine: "تیره، زرشکی و سیاه" } as Record<string, string>,
+  themeNames: { lavender: "اسطوخودوس", default: "پیش‌فرض", jungle: "جنگل", shadow: "سایه", strawberry: "رویای توت‌فرنگی", neutral: "شیک و ملایم", sky: "آسمون", wine: "شراب" } as Record<string, string>,
+  themeBlurbs: { lavender: "سفید سرد و بنفش ملایم", default: "تقریباً سیاه با شیشه‌ی بنفش", jungle: "خاک قهوه‌ای و سبز تیره", shadow: "سیاه، سفید و سایه‌های بلند", strawberry: "صورتی و بنفش، با رنگین‌کمون", neutral: "هلویی و قهوه‌ای گرم", sky: "آبی روشن، ابر و بارون", wine: "تیره، زرشکی و سیاه" } as Record<string, string>,
   // ---- sample data
   sampleGoals: ["برنامه‌نویس بک‌اند بهتری بشم", "برای امتحانای دانشگاهم آماده شم"],
   sampleTasks: ["جواب ایمیلای مونده رو بدم", "یه نگاه به خرج و مخارج این هفته بندازم", "پیش‌نویس پروپوزال پروژه رو بنویسم"],

@@ -82,7 +82,7 @@ export function Dialog({
     const previous = document.activeElement as HTMLElement | null;
     const el = ref.current;
     // Respect autoFocus on a field; otherwise start in the content rather than on the Close button.
-    setTimeout(() => {
+    const focusTimer = setTimeout(() => {
       if (!el || (!initialFocus && el.contains(document.activeElement))) return;
       const first =
         (initialFocus && el.querySelector<HTMLElement>(initialFocus)) ||
@@ -113,6 +113,7 @@ export function Dialog({
     };
     document.addEventListener("keydown", onKey, true);
     return () => {
+      clearTimeout(focusTimer);
       document.removeEventListener("keydown", onKey, true);
       previous?.focus?.();
     };

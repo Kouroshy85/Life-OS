@@ -1,8 +1,9 @@
-import { LayoutGrid, Menu as MenuIcon, Plus, Sun, Wallet } from "lucide-react";
+import { LayoutGrid, Menu as MenuIcon, Sun, Wallet } from "lucide-react";
 import { useEffect } from "react";
 import { t } from "../../i18n";
-import { navigate, openComposer, setDrawerOpen, useApp } from "../../state/store";
+import { navigate, setDrawerOpen, useApp } from "../../state/store";
 import { LiquidGlass } from "../../ui/LiquidGlass";
+import { MobileQuickAdd } from "./MobileQuickAdd";
 
 /** The floating button that opens the side menu. */
 export function DrawerButton() {
@@ -50,10 +51,6 @@ export function TabBar() {
 
   return (
     <LiquidGlass as="nav" className="tabbar" radius={26} bezel={9} strength={14} blur={16} aria-label={t.navMain}>
-      <button type="button" className={`tab ${composerOpen ? "tab--on" : ""}`} aria-haspopup="dialog" onClick={() => openComposer(true)}>
-        <Plus size={20} strokeWidth={2.2} />
-        <span>{t.tabGoal}</span>
-      </button>
       <button type="button" className={`tab ${home ? "tab--on" : ""}`} aria-current={home ? "page" : undefined} onClick={() => navigate("today")}>
         <Sun size={20} strokeWidth={2.2} />
         <span>{t.tabHome}</span>
@@ -66,6 +63,7 @@ export function TabBar() {
         <Wallet size={20} strokeWidth={2.2} />
         <span>{t.navFinancial}</span>
       </button>
+      <MobileQuickAdd />
     </LiquidGlass>
   );
 }

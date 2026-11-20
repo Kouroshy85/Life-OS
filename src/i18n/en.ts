@@ -976,7 +976,9 @@ export const en = {
   // ---- phone
   menuOpen: "Open menu",
   menuClose: "Close menu",
-  tabGoal: "New goal",
+  quickAdd: "Quick add",
+  addTransaction: "Add transaction",
+  addIncome: "Add income",
   tabHome: "Home",
   tabWeek: "Week",
   liteTitle: "Reduce animations and graphics",
@@ -1000,8 +1002,8 @@ export const en = {
   themeTitle: "Theme",
   themeHint: "Changes every colour, shadow and glow in the app, and the scene behind it.",
   themeChange: (name: string) => `Theme: ${name}. Change theme`,
-  themeNames: { default: "Default", jungle: "Jungle", shadow: "Shadow", strawberry: "Strawberry dreams", neutral: "Neutral elegance", sky: "Sky", wine: "Wine" } as Record<string, string>,
-  themeBlurbs: { default: "Near-black with violet glass", jungle: "Brown earth and dark green", shadow: "Black, white and long shadows", strawberry: "Pink and purple, with a rainbow", neutral: "Warm peach and brown", sky: "Pale blue, clouds and rain", wine: "Dark, wine red and black" } as Record<string, string>,
+  themeNames: { lavender: "Lavender", default: "Default", jungle: "Jungle", shadow: "Shadow", strawberry: "Strawberry dreams", neutral: "Neutral elegance", sky: "Sky", wine: "Wine" } as Record<string, string>,
+  themeBlurbs: { lavender: "Cool whites and soft violet", default: "Near-black with violet glass", jungle: "Brown earth and dark green", shadow: "Black, white and long shadows", strawberry: "Pink and purple, with a rainbow", neutral: "Warm peach and brown", sky: "Pale blue, clouds and rain", wine: "Dark, wine red and black" } as Record<string, string>,
   // ---- sample data
   sampleGoals: ["Become a better backend developer", "Prepare for my university exams"],
   sampleTasks: ["Reply to pending emails", "Review this week's budget", "Draft project proposal"],

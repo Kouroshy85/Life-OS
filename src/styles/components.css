@@ -314,7 +314,7 @@
 .select {
   appearance: none;
   padding-inline-end: 34px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http: //www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a5a1b5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23736d88' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
   background-repeat: no-repeat;
   background-position: right 12px center;
 }
@@ -686,10 +686,27 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   color: var(--text-2);
 }
 
-.menu__item:hover,
+.menu__item[aria-checked="true"] {
+  color: var(--violet-300);
+  background: var(--selection-wash);
+}
+
+.menu__item[aria-checked="true"] svg {
+  color: currentColor;
+}
+
+.menu__item:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
 .menu__item:focus-visible {
-  background: rgb(var(--ink) / 0.08);
+  outline: 2px solid var(--violet-400);
+  outline-offset: -2px;
   box-shadow: none;
+}
+
+.menu__item:disabled {
+  opacity: 0.55;
 }
 
 .menu__item--danger,

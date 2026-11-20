@@ -1,7 +1,7 @@
 import { calendarMonth } from "../../domain/calendar";
 import { useState } from "react";
 import { currencyScale, CURRENCIES, formatMoneyInput, parseMoneyInput } from "../../domain/finance/money";
-import { type FinanceCommand, type FinanceSnapshot } from "../../domain/finance/types";
+import { type FinanceCommand, type FinanceSnapshot, type Transaction } from "../../domain/finance/types";
 import { num } from "../../domain/locale";
 import { newId } from "../../persistence/repository";
 import { DurableSaveError } from "../../persistence/driver";
@@ -14,9 +14,23 @@ import { categoryLabel, f, typeName } from "./copy";
 
 export type EditorEntity = "account" | "transaction" | "category" | "budget" | "goal" | "contribution";
 export interface EditorRequest { entity: EditorEntity; row?: Record<string, unknown>; defaults?: Record<string, string> }
+
+export function transactionRequest(data: FinanceSnapshot, type: Transaction["type"], currency: string = data.currency): EditorRequest {
+  const activeAccounts = data.accounts.filter((account) => !account.archived);
+  const account = activeAccounts.find((entry) => entry.currency === currency) ?? activeAccounts[0];
+  if (!account) return { entity: "account" };
+  return { entity: "transaction", defaults: { type, accountId: account.id,
+    categoryId: data.categories.find((category) => category.type === type && !category.archived)?.id ?? "" } };
+}
+
 const names = () => ({ account: f("Account", "حساب"), transaction: f("Transaction", "تراکنش"), category: f("Category", "دسته‌بندی"), budget: f("Monthly budget", "بودجه ماهانه"), goal: f("Savings goal", "هدف پس‌انداز"), contribution: f("Savings allocation", "تخصیص پس‌انداز") });
 const valueOf = (row: Record<string, unknown>, key: string) => String(row[key] ?? "");
-export function FinanceEditor({ request, data, onClose }: { request: EditorRequest; data: FinanceSnapshot; onClose: () => void }) {
+export function FinanceEditor({ request, data, onClose, onSaved }: {
+  request: EditorRequest;
+  data: FinanceSnapshot;
+  onClose: () => void;
+  onSaved?: (data: FinanceSnapshot) => void;
+}) {
   const { unit } = useIranUnit();
   const today = useApp((s) => s.clock.today);
   const { entity, row } = request;
@@ -57,8 +71,10 @@ export function FinanceEditor({ request, data, onClose }: { request: EditorReque
         case "goal": command = { entity, value: { id, name: values.name, ...money, targetMinor: amount("target"), targetDate: values.targetDate || null, description: values.description, status: values.status as "active", accountId: values.accountId || null } }; break;
         case "contribution": command = { entity, value: { id, goalId: values.goalId, amountMinor: amount("amount"), date: values.date, notes: values.notes } }; break;
       }
-      await saveFinance(command);
-      toast(f("Finance changes saved.", "تغییرات مالی ذخیره شد."), "success"); onClose();
+      const saved = await saveFinance(command);
+      toast(f("Finance changes saved.", "تغییرات مالی ذخیره شد."), "success");
+      if (onSaved) onSaved(saved);
+      else onClose();
     } catch (e) {
       if (e instanceof DurableSaveError) { toast(e.message, "error"); onClose(); }
       else setError(e instanceof Error ? e.message : String(e));

@@ -83,6 +83,8 @@
   --accent-soft: rgb(var(--a500) / 0.14);
   --accent-softer: rgb(var(--a500) / 0.08);
   --accent-line: rgb(var(--a400) / 0.38);
+  --selection-wash: rgb(var(--a500) / 0.15);
+  --selection-edge: rgb(var(--a400) / 0.24);
 
   /* Semantic */
   --success: rgb(var(--success-rgb));

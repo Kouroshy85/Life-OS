@@ -165,7 +165,7 @@
 
   .tabbar {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
     gap: 4px;
     position: fixed;
     bottom: calc(10px + var(--safe-bottom));
@@ -175,7 +175,6 @@
     height: 52px;
     padding: 3px 5px;
     transform: translateX(-50%);
-    direction: ltr;
   }
 
   .tab {
@@ -212,8 +211,21 @@
 
   .tab--on,
   .tab--on:active {
-    color: var(--text);
-    background: var(--accent-soft);
+    color: var(--violet-300);
+    background: var(--selection-wash);
+  }
+
+  .quick-add-trigger {
+    width: 44px;
+    min-height: 44px;
+    align-self: center;
+    margin-inline: 3px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .quick-add-trigger:focus-visible {
+    border-radius: 50%;
   }
 
   /* ---- dialogs and menus: sheets from the bottom, big enough to tap --------------- */
@@ -233,7 +245,19 @@
   }
 
   .dialog__head {
-    padding: 22px 18px 8px;
+    padding: 24px 18px 8px;
+  }
+
+  .dialog__head::before {
+    content: "";
+    position: absolute;
+    inset-block-start: 8px;
+    inset-inline: 0;
+    width: 30px;
+    height: 3px;
+    margin-inline: auto;
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
   }
 
   @keyframes sheet-up {
@@ -254,6 +278,31 @@
   .toast {
     max-width: none;
   }
+}
+
+/* Quick actions stay stacked when the viewport grows while the sheet is open. */
+.quick-add-actions {
+  display: grid;
+  gap: 8px;
+  padding-block-end: 12px;
+}
+
+.quick-add-actions .btn {
+  min-height: 48px;
+  justify-content: flex-start;
+  text-align: start;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  background: var(--surface);
+}
+
+.quick-add-actions .btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.quick-add-actions svg {
+  color: var(--violet-300);
 }
 
 /* =========================================================================

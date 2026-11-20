@@ -8,13 +8,14 @@ import { getLang, num, pct } from "../../domain/locale";
 import { formatFullDate, formatMonthYear, formatShortDate } from "../../domain/time";
 import { calendarMonth, calendarQuarter, displayDate, getCalendar, shiftCalendarMonth, shiftDate, APP_TIME_ZONE } from "../../domain/calendar";
 import { occurrenceDate } from "../../domain/finance/recurring";
+import { t } from "../../i18n";
 import { processRecurringIncome, retryFinanceStorage, saveFinance, useFinance, useRecurring } from "../../state/finance";
 import { toast, useApp } from "../../state/store";
 import { DateInput, SelectInput, TextInput } from "../../ui/fields";
 import { Bar, Button, Dialog, Empty, Field, IconButton, Menu } from "../../ui/primitives";
 import { IranUnitSwitch, useIranUnit } from "./IranUnitSwitch";
 import { categoryLabel, f, sectionNames, typeName } from "./copy";
-import { editorKey, FinanceEditor, type EditorRequest } from "./FinanceEditor";
+import { editorKey, FinanceEditor, transactionRequest, type EditorRequest } from "./FinanceEditor";
 
 import { FinanceNavigation, financeNavigate, useFinanceNavigation } from "./FinanceNavigation";
 import { RecurringView } from "./RecurringView";
@@ -100,14 +101,9 @@ export function FinanceView() {
   const names = sectionNames();
   const activeAccounts = data.accounts.filter((account) => !account.archived);
   const add = (entity: EditorRequest["entity"], label: string) => <Button variant="primary" icon={<Plus size={18} />} onClick={() => open({ entity })}>{label}</Button>;
-  const addTransaction = (type: "income" | "expense" | "transfer") => {
-    if (!activeAccounts.length) { open({ entity: "account" }); return; }
-    const account = activeAccounts.find((entry) => entry.currency === currency) ?? activeAccounts[0];
-    open({ entity: "transaction", defaults: { type, accountId: account.id,
-      categoryId: data.categories.find((category) => category.type === type && !category.archived)?.id ?? "" } });
-  };
+  const addTransaction = (type: Transaction["type"]) => open(transactionRequest(data, type, currency));
   const quickActions = <div className="finance-quick-actions">
-    <Button className="finance-add finance-add--primary" icon={<Coins size={23} />} onClick={() => addTransaction("income")}>{f("Add income", "افزودن درآمد")} <Plus size={20} /></Button>
+    <Button className="finance-add finance-add--primary" icon={<Coins size={23} />} onClick={() => addTransaction("income")}>{t.addIncome} <Plus size={20} /></Button>
     <Button className="finance-add finance-add--secondary" icon={<Wallet size={23} />} onClick={() => addTransaction("expense")}>{f("Add expense", "افزودن هزینه")} <Plus size={20} /></Button>
   </div>;
   if (!ready) return <div className="page" role="status">{f("Opening Finance…", "در حال باز کردن بخش مالی…")}</div>;

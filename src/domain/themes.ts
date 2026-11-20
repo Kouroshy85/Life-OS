@@ -3,7 +3,7 @@
  * Stylesheets only refer to the tokens these values fill in.
  */
 
-export type ThemeId = "default" | "jungle" | "shadow" | "strawberry" | "neutral" | "sky" | "wine";
+export type ThemeId = "lavender" | "default" | "jungle" | "shadow" | "strawberry" | "neutral" | "sky" | "wine";
 
 export interface Theme {
   id: ThemeId;
@@ -54,13 +54,30 @@ export interface Theme {
   cdLight: string;
   /** How solid panels are, so a theme's scene never sits behind text. */
   panel: number;
-  /** Finer shades. Only Default sets these, to keep its look exact; others use their nearest colour. */
+  /** Optional overrides for finer shades that would otherwise follow the palette. */
   shades?: Partial<Record<ShadeName, string>>;
 }
 
 type ShadeName = "aBright" | "aDeep" | "aDeepest" | "alt2" | "danger2" | "planEvent2" | "planGoal2" | "now2" | "nowSoft" | "glassStrong" | "cdSheen" | "cdTint" | "relaxBg" | "onAccentSoft" | "onDanger" | "cdTint2";
 
 export const THEMES: Theme[] = [
+  {
+    id: "lavender",
+    scheme: "light",
+    bg: "#f1f1fa", bg2: "#f7f7fd", bg3: "#e8e7f4", card: "#fbfbff",
+    ink: "#292541", well: "#e1dff2", shadow: "#3f376f",
+    text: "#201d37", text2: "#514b68", text3: "#68617d", onAccent: "#ffffff",
+    a300: "#6032cd", a400: "#7646e1", a500: "#7344df", a600: "#6334d1", a700: "#5526bd", alt: "#b4b2ec",
+    success: "#147b55", warning: "#93610d", danger: "#b92d42", info: "#255da8",
+    warningInk: "#784c08", dangerInk: "#a02137", infoInk: "#244c87",
+    planDefault: "#a890ed", planGoal: "#4dad8c", planEvent: "#cb922f", plan4: "#d97898", now: "#b42366",
+    glass: "#f3f2fc", overlay: "#35304d", titleFrom: "#201d37", titleTo: "#39315a",
+    cdDark: "#d5cef1", cdMid: "#f1edff", cdLight: "#7762ba", panel: 0,
+    shades: {
+      aBright: "#7646e1", aDeep: "#6334d1", aDeepest: "#5526bd", glassStrong: "#faf9ff",
+      planEvent2: "#de9b40", planGoal2: "#31a87d", nowSoft: "#ec89b2", onAccentSoft: "#4f27a8",
+    },
+  },
   {
     id: "default",
     scheme: "dark",
@@ -159,7 +176,7 @@ export const THEMES: Theme[] = [
   },
 ];
 
-export const DEFAULT_THEME: ThemeId = "default";
+export const DEFAULT_THEME: ThemeId = "lavender";
 
 export const themeById = (id: string | null | undefined): Theme => THEMES.find((x) => x.id === id) ?? THEMES[0];
 

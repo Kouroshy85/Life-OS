@@ -9,7 +9,8 @@
 /* ---- sidebar ------------------------------------------------------------------ */
 
 .sidebar {
-  margin: 14px 0 14px 14px;
+  margin: 14px;
+  margin-inline-end: 0;
   width: 220px;
   display: flex;
   flex-direction: column;
@@ -52,7 +53,7 @@
   border-radius: 14px;
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-on-accent);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%),
     linear-gradient(180deg, rgb(var(--a500) / 0.85), rgb(var(--a700) / 0.85));
   box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.45), 0 8px 20px -10px rgb(var(--a600) / 0.9);
@@ -97,14 +98,19 @@
 }
 
 .navitem--active {
-  color: var(--text);
+  color: var(--violet-300);
   font-weight: 620;
-  background: linear-gradient(180deg, rgb(var(--ink) / 0.11), rgb(var(--ink) / 0.05));
-  box-shadow: inset 0 0.5px 0 rgb(var(--ink) / 0.24), inset 0 0 0 0.5px rgb(var(--ink) / 0.06);
+  background: var(--selection-wash);
+  box-shadow: inset 0 0 0 1px var(--selection-edge);
 }
 
-.navitem--active svg {
+.navitem--active:hover {
   color: var(--violet-300);
+  background: var(--accent-soft);
+}
+
+.navitem--active:focus-visible {
+  box-shadow: var(--focus-ring);
 }
 
 .navitem--small {
